@@ -3,17 +3,60 @@ const CONFIG = {
   grade_order: ["white", "blue", "purple", "red", "gold"],
   grade_name: {white:"白色",blue:"蓝色",purple:"紫色",red:"红色",gold:"金色"},
   gradeColor: {white:"grade-white",blue:"grade-blue",purple:"grade-purple",red:"grade-red",gold:"grade-gold"},
+  style_name: {taiji:"太极",huashan:"剑法",bang:"棍掌",xingxiu:"毒器",xiaoyao:"逍遥掌",gumu:"玉女剑",shaolin:"少林",quanzhen:"全真",taohua:"落英",other:"通用"},
   scrollNeed: {white:5,blue:10,purple:20,red:35,gold:50},
 
+  // 状态类型: dot 持续扣血 / dot_mp 持续扣内 / dot_both 血内双扣 /
+  // debuff 减益 / buff 增益 / instant 命中即触发的即时效果
   state_def: {
-    bleed: {name:"流血",desc:"每回合扣血，降低防御",dmg:12,type:"dot"},
-    internal_injury: {name:"内伤",desc:"每回合扣内力，武学冷却变长",dmg:8,type:"dot_mp"},
-    poison: {name:"蚀骨毒",desc:"毒素持续侵蚀气血",dmg:15,type:"dot"},
-    cold_poison: {name:"寒毒",desc:"同时扣血+扣内力",dmg:10,mpDmg:6,type:"dot_both"},
-    rebound: {name:"卸力反弹",desc:"反弹敌方攻击伤害",type:"buff"},
-    slow_qi: {name:"滞气",desc:"攻击降低，集气变慢",type:"debuff"},
-    seal_weapon: {name:"封兵刃",desc:"不能使用兵刃武学",type:"debuff"},
-    seal_skill: {name:"封武学",desc:"封印招式",type:"debuff"}
+    bleed:            {name:"流血",     desc:"每回合扣血并降低防御",     dmg:10, mpDmg:0, type:"dot",       defDown:0.15},
+    poison:           {name:"蚀骨毒",  desc:"毒素持续侵蚀气血",         dmg:13, mpDmg:0, type:"dot"},
+    internal_injury:  {name:"内伤",    desc:"每回合扣内力，攻防受损",   dmg:0,  mpDmg:7, type:"dot_mp", atkDown:0.1},
+    cold_poison:      {name:"寒毒",    desc:"同时扣血+扣内力",          dmg:9,  mpDmg:5, type:"dot_both"},
+    rebound:          {name:"卸力反弹",desc:"反弹敌方40%攻击伤害",      type:"buff", reflect:0.4},
+    rebound_up:       {name:"反弹增幅",desc:"反弹比例提升至65%",        type:"buff", reflect:0.65},
+    slow_qi:          {name:"滞气",    desc:"攻击降低，集气变慢",       type:"debuff", atkDown:0.15, qiDown:0.2},
+    slow:             {name:"寒劲迟滞", desc:"身法迟缓，攻击略降",       type:"debuff", atkDown:0.08},
+    seal_weapon:      {name:"封兵刃",   desc:"不能使用兵刃类武学",       type:"debuff", seal:"weapon"},
+    seal_skill:       {name:"封武学",   desc:"随机招式被封印",           type:"debuff", seal:"skill"},
+    seal_atk:         {name:"封普攻",   desc:"短暂锁脉，无法普攻",       type:"debuff", seal:"attack"},
+    break_def:       {name:"破防",     desc:"防御大幅降低",             type:"debuff", defDown:0.3},
+    atk_down:         {name:"攻乏",     desc:"攻击力下降",               type:"debuff", atkDown:0.12},
+    poison_lock_mp:   {name:"封内",     desc:"封禁内力自然回复",         type:"debuff", lockMp:true},
+    steal_mp:         {name:"夺内",     desc:"命中偷取敌方内力",         type:"instant", stealMp:10},
+    combo:            {name:"连击",     desc:"追加一段连击伤害",         type:"instant", comboHits:1},
+    combo_up:         {name:"蓄势",     desc:"下一招连击概率提升",       type:"buff", comboBonus:0.3},
+    def_up:           {name:"金钟护体", desc:"自身防御提升",             type:"buff", defUp:0.2},
+    self_def:         {name:"伏魔护身", desc:"自身减伤提升",             type:"buff", defUp:0.15},
+    purify:           {name:"净化",     desc:"清除自身负面状态",         type:"instant", purify:"all"},
+    purify_one:       {name:"涤秽",     desc:"清除自身一个负面状态",     type:"instant", purify:"one"},
+    purify_low:       {name:"正气驱散", desc:"驱散弱负面状态",           type:"instant", purify:"one"},
+    heal:             {name:"疗伤",     desc:"恢复自身气血",             type:"instant", heal:0.15},
+    heal_up:          {name:"自愈",     desc:"持续回复气血",             type:"buff", healRegen:0.05},
+    mp_regen:         {name:"内息",     desc:"持续回复内力",             type:"buff", mpRegen:0.08},
+    anti_cold:        {name:"阳躯",     desc:"免疫寒毒",                 type:"buff", antiCold:true},
+    dmg_vs_poison:    {name:"诛邪",     desc:"对中毒目标增伤",           type:"instant", vsPoison:0.25},
+    self_hurt_dmg:    {name:"舍身",     desc:"自损气血换取爆发",         type:"instant", selfCost:0.08, dmgBonus:0.4},
+    stable_dmg:       {name:"稳击",     desc:"伤害稳定浮动减小",         type:"buff", stable:true},
+    illusion:         {name:"幻术",     desc:"概率闪避敌方攻击",         type:"buff", dodge:0.2},
+    light_shock:      {name:"震伤",     desc:"轻微外伤持续耗血",         type:"dot", dmg:6, mpDmg:0},
+    poison_delay_injury: {name:"迟发毒伤", desc:"数回合后爆发内伤",      type:"debuff", delayedInjury:true},
+    charge_dmg:       {name:"蓄力重击", desc:"攻击力临时提升",           type:"buff", atkUp:0.25},
+    copy_skill:       {name:"变招",     desc:"复刻补刀，追加一段伤害",   type:"instant", comboHits:1},
+    heal_team:        {name:"团队续航", desc:"持续回复气血",             type:"buff", healRegen:0.05},
+    atk_def_up:       {name:"阵法加持", desc:"攻防同步提升",             type:"buff", atkUp:0.15, defUp:0.15},
+    purify_heal_team: {name:"先天正气", desc:"净化自身并回复气血",       type:"instant", purify:"all", heal:0.1},
+    purify_poison:    {name:"纯阳驱毒", desc:"清除身上毒类状态",         type:"instant", purify:"poison"},
+    all_round:        {name:"九阴归元", desc:"攻防均衡提升",             type:"buff", atkUp:0.1, defUp:0.1}
+  },
+
+  // 旧配置里的叠加类/同义状态 → 映射到基础状态（叠加层数由代码维护）
+  state_alias: {
+    bleed_stack: "bleed",
+    poison_stack: "poison",
+    internal_injury_stack: "internal_injury",
+    internal_injury_multi: "internal_injury",
+    rebound_team: "rebound_up"
   },
 
   dungeon_list: [
@@ -67,6 +110,13 @@ const CONFIG = {
     }
   ],
 
+  // 专精分支：隐士授艺三选一
+  spec_def: {
+    anqi:     {name:"暗器之道", desc:"针、镖、飞刀、弹石等暗器招式增伤 15%"},
+    du:       {name:"毒术专精", desc:"毒系招式增伤 15%，蚀毒更烈"},
+    quanjiao: {name:"拳脚功夫", desc:"掌、拳、指、爪等近身搏击增伤 15%"}
+  },
+
   herb_list: [
     {name:"回血草",grade:"white",effect:"heal",val:60,price:20,desc:"恢复60气血"},
     {name:"凝神花",grade:"blue",effect:"mp",val:40,price:40,desc:"恢复40内力"},
@@ -74,13 +124,41 @@ const CONFIG = {
     {name:"大还丹",grade:"gold",effect:"healAll",val:0,price:300,desc:"满血满内，清除debuff"}
   ],
 
-  equip_list: [
-    {name:"粗布袍",grade:"white",atk:0,def:4,price:30},
-    {name:"铁剑",grade:"white",atk:6,def:0,price:40},
-    {name:"青布劲装",grade:"blue",atk:2,def:10,price:120},
-    {name:"精钢长剑",grade:"purple",atk:14,def:2,price:300},
-    {name:"金丝宝甲",grade:"red",atk:4,def:22,price:800},
-    {name:"玄铁重剑",grade:"gold",atk:28,def:6,price:2000}
+  // 装备池：slot=weapon兵刃/暗器 | armor防具；style=适配套路（匹配出招套路有额外加成）
+  // 仅 white 品级在商店出售，蓝及以上全部靠副本/BOSS/野外掉落
+  equip_pool: [
+    // —— 白装（商店有售）——
+    {name:"粗布袍",   grade:"white", slot:"armor",  style:"other",   atk:0,  def:4,  price:30},
+    {name:"铁剑",     grade:"white", slot:"weapon", style:"huashan", atk:6,  def:0,  price:40},
+    {name:"白木棍",   grade:"white", slot:"weapon", style:"bang",    atk:5,  def:1,  price:35},
+    // —— 蓝装（掉落）——
+    {name:"青布劲装", grade:"blue",  slot:"armor",  style:"other",   atk:2,  def:10},
+    {name:"青钢长剑", grade:"blue",  slot:"weapon", style:"huashan", atk:10, def:1},
+    {name:"齐眉棍",   grade:"blue",  slot:"weapon", style:"bang",    atk:10, def:1},
+    {name:"淬毒飞刀", grade:"blue",  slot:"weapon", style:"xingxiu", atk:9,  def:0},
+    // —— 紫装（掉落）——
+    {name:"精钢长剑", grade:"purple",slot:"weapon", style:"huashan", atk:14, def:2},
+    {name:"打狗棒",   grade:"purple",slot:"weapon", style:"bang",    atk:15, def:2},
+    {name:"铁掌套",   grade:"purple",slot:"weapon", style:"xiaoyao", atk:13, def:3},
+    {name:"软猬宝甲", grade:"purple",slot:"armor",  style:"other",   atk:3,  def:16},
+    {name:"蝎尾银针", grade:"purple",slot:"weapon", style:"xingxiu", atk:14, def:1},
+    // —— 红装（掉落）——
+    {name:"金丝宝甲", grade:"red",   slot:"armor",  style:"other",   atk:4,  def:22},
+    {name:"太极长剑", grade:"red",   slot:"weapon", style:"taiji",    atk:20, def:3},
+    {name:"落英神剑", grade:"red",   slot:"weapon", style:"taohua",  atk:21, def:2},
+    {name:"淑女剑",   grade:"red",   slot:"weapon", style:"gumu",     atk:20, def:3},
+    {name:"伏魔禅杖", grade:"red",   slot:"weapon", style:"shaolin", atk:19, def:4},
+    // —— 金装（BOSS/顶级副本掉落）——
+    {name:"玄铁重剑", grade:"gold",  slot:"weapon", style:"huashan", atk:28, def:6},
+    {name:"倚天剑",   grade:"gold",  slot:"weapon", style:"taohua",  atk:30, def:5},
+    {name:"镇帮打狗棒",grade:"gold", slot:"weapon", style:"bang",    atk:29, def:5},
+    {name:"天蚕宝衣", grade:"gold",  slot:"armor",  style:"other",   atk:6,  def:30},
+    {name:"含沙射影", grade:"gold",  slot:"weapon", style:"xingxiu", atk:27, def:4},
+    {name:"真武荡魔剑",grade:"gold", slot:"weapon", style:"taiji",    atk:27, def:6},
+    {name:"逍遥御风扇",grade:"gold", slot:"weapon", style:"xiaoyao",  atk:26, def:5},
+    {name:"冰魄寒玉剑",grade:"gold", slot:"weapon", style:"gumu",     atk:27, def:5},
+    {name:"金刚降魔杵",grade:"gold", slot:"weapon", style:"shaolin", atk:26, def:6},
+    {name:"天罡北斗剑",grade:"gold", slot:"weapon", style:"quanzhen",atk:27, def:5}
   ],
 
   neigong_def: {
@@ -237,6 +315,44 @@ const CONFIG = {
       {name:"九阴白骨爪",grade:"gold",mpCost:30,range:"fan",state:"bleed,poison",style:"other",desc:"九阴外功，流血附带阴毒"},
       {name:"九阳神功",grade:"gold",mpCost:0,range:"self",state:"heal_up,mp_regen,anti_cold",style:"other",desc:"阳刚自愈、增伤、抗寒毒"},
       {name:"九阴真经",grade:"gold",mpCost:0,range:"self",state:"all_round,heal,illusion",style:"other",desc:"攻防均衡，附带阴柔幻术、疗伤"}
+    ],
+
+    // 门派师傅配置：教学到出师
+    master_def: {
+      "武当派":  {name:"张三丰",  title:"武当掌门",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"太极神功",   gradTitle:"武当传人", gradStyle:"taiji",  quote:"柔能克刚，后发先至，你且好生体悟。"},
+      "华山派":  {name:"风清扬",  title:"剑宗长老",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"紫霞神功",   gradTitle:"华山剑宗", gradStyle:"huashan",quote:"剑招无招，行云流水，切记。"},
+      "丐帮":    {name:"洪七公",  title:"丐帮帮主",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"降龙心法",   gradTitle:"丐帮弟子", gradStyle:"bang",    quote:"侠义为本，掌劲为公，莫要堕了丐帮威名。"},
+      "星宿派":  {name:"丁春秋",  title:"星宿老仙",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"星宿毒经",   gradTitle:"星宿门人", gradStyle:"xingxiu",quote:"哈哈哈哈，乖徒儿，把毒功练得炉火纯青。"},
+      "逍遥派":  {name:"无崖子",  title:"逍遥掌门",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"八荒六合唯我独尊功", gradTitle:"逍遥客", gradStyle:"xiaoyao", quote:"逍遥天地间，随心而动。"},
+      "古墓派":  {name:"林朝英",  title:"古墓祖师",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"玉女心经",   gradTitle:"古墓遗徒", gradStyle:"gumu",   quote:"清寂幽居，剑心玉女，望你持守本心。"},
+      "少林派":  {name:"玄慈方丈",title:"少林方丈",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"少林九阳功", gradTitle:"少林俗家", gradStyle:"shaolin", quote:"金刚伏魔，慈悲为怀，善护自身。"},
+      "全真教":  {name:"王重阳",  title:"全真祖师",   graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"先天功",     gradTitle:"全真弟子", gradStyle:"quanzhen",quote:"玄门正气，清净无为，克敌先克己。"},
+      "桃花岛":  {name:"黄药师",  title:"东邪",       graduateLv:20, graduateSkills:3, rewardGold:300, rewardNeigong:"桃花奇门心法", gradTitle:"桃花门人", gradStyle:"taohua", quote:"奇门遁甲，落英缤纷，你可有几分悟性？"}
+    },
+
+    // 金庸原著 BOSS（精英/挑战）
+    boss_list: [
+      {name:"梅超风",  lv:18, hp:320,  atk:26, def:8,  skill:"九阴白骨爪", state:"bleed,poison",        dropGrade:["blue","purple"], desc:"黑风双煞之一，爪阴毒狠辣"},
+      {name:"欧阳克",  lv:28, hp:430,  atk:34, def:12, skill:"灵蛇拳",     state:"slow_qi",             dropGrade:["purple"],        desc:"白驼山少主，拳势如蛇"},
+      {name:"鸠摩智",  lv:45, hp:620,  atk:48, def:18, skill:"火焰刀",     state:"internal_injury",      dropGrade:["purple","red"],  desc:"吐蕃国师，火焰刀凌厉"},
+      {name:"洪七公",  lv:55, hp:760,  atk:56, def:22, skill:"降龙掌",     state:"internal_injury",      dropGrade:["red"],           desc:"北丐，降龙掌刚猛雄浑"},
+      {name:"黄药师",  lv:65, hp:860,  atk:60, def:26, skill:"落英神剑",   state:"combo,break_def",      dropGrade:["red"],           desc:"东邪，奇门音律连绵"},
+      {name:"一灯大师",lv:72, hp:900,  atk:58, def:30, skill:"一阳指",     state:"purify_poison,heal",   dropGrade:["red","gold"],    desc:"南帝，一阳指纯阳驱邪"},
+      {name:"欧阳锋",  lv:82, hp:1050, atk:72, def:28, skill:"蛤蟆功",     state:"poison,internal_injury",dropGrade:["gold"],          desc:"西毒，蛤蟆功毒劲霸道"},
+      {name:"金轮法王",lv:90, hp:1180, atk:80, def:32, skill:"龙象般若功", state:"internal_injury",      dropGrade:["gold"],          desc:"蒙古国师，龙象十三层"},
+      {name:"周伯通",  lv:96, hp:1250, atk:78, def:34, skill:"空明拳",     state:"combo",                dropGrade:["gold"],          desc:"中顽童，左右互搏连环"}
+    ],
+
+    // 野外明雷怪模板（按等级段）
+    wild_mobs: [
+      {name:"山贼探子", lv:1,  hp:150,  atk:12, def:3,  dropGrade:["white"]},
+      {name:"野狼群",   lv:8,  hp:220,  atk:18, def:5,  dropGrade:["white","blue"]},
+      {name:"绿林大盗", lv:18, hp:320,  atk:26, def:8,  dropGrade:["blue"]},
+      {name:"恶僧",     lv:30, hp:430,  atk:34, def:12, dropGrade:["blue","purple"]},
+      {name:"邪派弟子", lv:45, hp:600,  atk:46, def:16, dropGrade:["purple"]},
+      {name:"江湖悍匪", lv:60, hp:720,  atk:54, def:20, dropGrade:["purple","red"]},
+      {name:"西域高手", lv:75, hp:860,  atk:64, def:24, dropGrade:["red"]},
+      {name:"武林魔头", lv:90, hp:1000, atk:74, def:28, dropGrade:["red","gold"]}
     ]
   };
 
@@ -245,9 +361,16 @@ let player = {};
 let currentSchool = null;
 let enemy = null;
 let inBattle = false;
-let currentQuestNpc = null;
+let currentQuest = null;
 let battleBusy = false;
 let currentDungeon = null;
+let currentScene = "";
+let wildSpawns = [];   // 大地图明雷怪 {name,x,y,alive}
+let autoBattle = false;
+let battleTimer = null;
+let lastPlayerQiReady = null;
+const QI_PER_TICK = 4;      // 每 tick 基础集气量（乘 qiSpeed）
+const TICK_MS = 120;        // 半即时 tick 间隔
 
 const logDom = document.getElementById("battleLog");
 const audioAttack = document.getElementById("audioAttack");
@@ -257,22 +380,41 @@ const audioBgm = document.getElementById("audioBgm");
 let bgmStarted = false;
 
 // ========== 属性计算 ==========
+function wornEquips(){
+  const arr = [];
+  if(player.wearWeapon) arr.push(player.wearWeapon);
+  if(player.wearArmor) arr.push(player.wearArmor);
+  return arr;
+}
 function calcPlayerStat(){
   let baseAtk = player.baseAtk;
   let baseDef = player.baseDef;
   let qiSpeed = 1.0;
-  if(player.wearEquip){
-    baseAtk += player.wearEquip.atk;
-    baseDef += player.wearEquip.def;
-  }
+  wornEquips().forEach(e=>{
+    baseAtk += (e.atk||0);
+    baseDef += (e.def||0);
+  });
   const ng = CONFIG.neigong_def[player.nowNeigong];
   if(ng){
-    baseAtk += (ng.atk||0);
-    baseDef += (ng.def||0);
+    baseAtk += (ng.atk||0) + (ng.passiveAtk||0);
+    baseDef += (ng.def||0) + (ng.passiveDef||0);
   }
   const qg = CONFIG.qinggong_def[player.nowQinggong];
   if(qg) qiSpeed = qg.qiSpeed;
-  return {atk:baseAtk,def:baseDef,qiSpeed};
+  const mod = getStateMod(player);
+  const atk = Math.max(1, Math.round(baseAtk * mod.atkMul));
+  const def = Math.max(0, Math.round(baseDef * mod.defMul));
+  qiSpeed = qiSpeed * mod.qiMul;
+  return {atk, def, qiSpeed, mod};
+}
+
+// 敌人属性（受自身debuff/buff修正）
+function calcEnemyStat(){
+  if(!enemy) return {atk:1, def:0, mod:getStateMod(null)};
+  const mod = getStateMod(enemy);
+  const atk = Math.max(1, Math.round(enemy.atk * mod.atkMul));
+  const def = Math.max(0, Math.round((enemy.def||0) * mod.defMul));
+  return {atk, def, mod};
 }
 
 // ========== 存档 ==========
@@ -283,6 +425,22 @@ function loadSave(){
   const str = localStorage.getItem(SAVE_KEY);
   if(!str) { alert("没有找到存档！"); return; }
   player = JSON.parse(str);
+  // 兼容旧存档：补齐新字段
+  player.debuff = player.debuff || [];
+  player.buff = player.buff || [];
+  player.comboCharge = player.comboCharge || 0;
+  player.qi = player.qi || 0;
+  player.masterGraduated = !!player.masterGraduated;
+  // 旧存档单槽装备迁移到双槽
+  if(player.wearEquip){
+    if(player.wearEquip.slot === "armor") player.wearArmor = player.wearEquip;
+    else player.wearWeapon = player.wearEquip;
+    delete player.wearEquip;
+  }
+  player.wearWeapon = player.wearWeapon || null;
+  player.wearArmor = player.wearArmor || null;
+  player.title = player.title || "";
+  player.spec = player.spec || "";
   currentSchool = CONFIG.school_list.find(s=>s.school === player.school);
   document.getElementById("menu").classList.add("hide");
   document.getElementById("gamePanel").classList.remove("hide");
@@ -320,11 +478,18 @@ function selectSchool(sch){
     learnQinggong:[sch.qinggong[0]],
     nowNeigong:sch.neigong[0].name,
     nowQinggong:sch.qinggong[0].name,
-    wearEquip:null,
+    wearWeapon:null,
+    wearArmor:null,
     bag:{equip:[],herb:[],scroll:{white:0,blue:0,purple:0,red:0,gold:0}},
     partners:[],
     activePartner:null,
-    debuff:[]
+    debuff:[],
+    buff:[],
+    comboCharge:0,
+    qi:0,
+    masterGraduated:false,
+    title:"",
+    spec:""
   };
   saveGame();
   document.getElementById("menu").classList.add("hide");
@@ -353,11 +518,12 @@ function renderShop(){
     div.onclick = ()=>buyHerb(h);
     wrap.appendChild(div);
   })
-  wrap.innerHTML += "<div style='margin-top:8px'>【装备】</div>";
-  CONFIG.equip_list.forEach(e=>{
+  wrap.innerHTML += "<div style='margin-top:8px'>【白装·兵刃/防具】（更好的装备需打怪掉落）</div>";
+  CONFIG.equip_pool.filter(e=>e.grade==="white").forEach(e=>{
     const div = document.createElement("div");
     div.className="item "+CONFIG.gradeColor[e.grade];
-    div.innerText = `${e.name} 攻击+${e.atk} 防御+${e.def}｜价格：${e.price}`;
+    const type = e.slot==="armor" ? "防具" : "兵刃";
+    div.innerText = `${e.name}〔${type}〕攻击+${e.atk} 防御+${e.def}｜价格：${e.price}`;
     div.onclick = ()=>buyEquip(e);
     wrap.appendChild(div);
   })
@@ -392,58 +558,150 @@ function useHerb(idx){
 }
 function wearEquip(idx){
   const e = player.bag.equip[idx];
-  if(!e)return;
-  if(player.wearEquip){
-    player.bag.equip.push(player.wearEquip);
-  }
-  player.wearEquip = e;
+  if(!e) return;
+  const slot = e.slot || "weapon";
+  const key = slot === "armor" ? "wearArmor" : "wearWeapon";
+  if(player[key]) player.bag.equip.push(player[key]);
+  player[key] = e;
   player.bag.equip.splice(idx,1);
-  addLog(`穿戴【${e.name}】`);
+  addLog(`穿戴【${e.name}】（${slot==="armor"?"防具":"兵刃/暗器"}）`);
+  saveGame();refreshUI();
+}
+function unwearEquip(slot){
+  const key = slot === "armor" ? "wearArmor" : "wearWeapon";
+  if(!player[key]) return;
+  player.bag.equip.push(player[key]);
+  player[key] = null;
   saveGame();refreshUI();
 }
 
-// ========== 奇遇系统 & 伙伴招募 ==========
+// ========== 奇遇系统：伙伴招募 / 宝箱 / 隐士授艺 ==========
 function triggerQuest(){
   if(Math.random() > 0.25) return false;
-  const canQuest = CONFIG.quest_npc.filter(n=>player.lv >= n.minLv && !player.partners.find(p=>p.id === n.id));
-  if(canQuest.length === 0) return false;
-  currentQuestNpc = canQuest[Math.floor(Math.random() * canQuest.length)];
   const box = document.getElementById("questBox");
   const textDom = document.getElementById("questText");
   const btnBox = document.getElementById("questBtnBox");
+  const canQuest = CONFIG.quest_npc.filter(n=>player.lv >= n.minLv && !player.partners.find(p=>p.id === n.id));
+
+  const roll = Math.random();
+  if(roll < 0.45 && canQuest.length){
+    currentQuest = {type:"recruit", npc: canQuest[Math.floor(Math.random()*canQuest.length)]};
+  }else if(roll < 0.80){
+    currentQuest = {type:"chest"};
+  }else{
+    currentQuest = {type:"hermit"};
+  }
   box.classList.remove("hide");
-  textDom.innerHTML = `<div>你偶遇了【${currentQuestNpc.name}】</div><div>${currentQuestNpc.intro}</div><div>想要邀他同行，需要 ${currentQuestNpc.needGold} 银两</div>`;
   btnBox.innerHTML = "";
-  const btnJoin = document.createElement("button");
-  btnJoin.innerText = "出资邀请入队";
-  btnJoin.onclick = ()=>questJoin();
-  btnBox.appendChild(btnJoin);
-  const btnLeave = document.createElement("button");
-  btnLeave.innerText = "拱手告辞";
-  btnLeave.onclick = ()=>questLeave();
-  btnBox.appendChild(btnLeave);
+
+  if(currentQuest.type === "recruit"){
+    const n = currentQuest.npc;
+    textDom.innerHTML = `<div>你偶遇了【${n.name}】</div><div>${n.intro}</div><div>想要邀他同行，需要 ${n.needGold} 银两</div>`;
+    const btnJoin = document.createElement("button");
+    btnJoin.innerText = "出资邀请入队";
+    btnJoin.onclick = ()=>questJoin();
+    btnBox.appendChild(btnJoin);
+    const btnLeave = document.createElement("button");
+    btnLeave.innerText = "拱手告辞";
+    btnLeave.onclick = ()=>questLeave();
+    btnBox.appendChild(btnLeave);
+  }else if(currentQuest.type === "chest"){
+    textDom.innerHTML = `<div>📦 路旁草丛里露出一只尘封的木箱</div><div>似是前人遗留，箱中或藏银两、药材、残页与兵刃。</div>`;
+    const btnOpen = document.createElement("button");
+    btnOpen.innerText = "撬开宝箱";
+    btnOpen.onclick = ()=>{ chestReward(); questLeave(); };
+    btnBox.appendChild(btnOpen);
+    const btnLeave = document.createElement("button");
+    btnLeave.innerText = "不去碰它";
+    btnLeave.onclick = ()=>questLeave();
+    btnBox.appendChild(btnLeave);
+  }else{
+    // 隐士授艺（专精分支）
+    if(!player.spec){
+      textDom.innerHTML = `<div>🧙 一位隐世老者在茶棚里打量你良久</div><div>「少年骨骼清奇，可愿择一艺专精？此艺一成，对应招式威力大增。」</div>`;
+      Object.entries(CONFIG.spec_def).forEach(([key, sd])=>{
+        const b = document.createElement("button");
+        b.innerText = sd.name;
+        b.title = sd.desc;
+        b.onclick = ()=>chooseSpec(key);
+        btnBox.appendChild(b);
+      });
+      const btnLeave = document.createElement("button");
+      btnLeave.innerText = "婉言谢绝";
+      btnLeave.onclick = ()=>questLeave();
+      btnBox.appendChild(btnLeave);
+    }else{
+      const sd = CONFIG.spec_def[player.spec];
+      textDom.innerHTML = `<div>🧙 隐士见你已有【${sd.name}】根基</div><div>略一指点，赠你些许修行资粮。</div>`;
+      const btnGift = document.createElement("button");
+      btnGift.innerText = "收下赠礼";
+      btnGift.onclick = ()=>{ hermitGift(); questLeave(); };
+      btnBox.appendChild(btnGift);
+    }
+  }
   return true;
 }
 function questJoin(){
-  if(player.gold < currentQuestNpc.needGold){
-    addLog(`银两不足，无法邀请${currentQuestNpc.name}`);
+  const n = currentQuest && currentQuest.npc;
+  if(!n) return;
+  if(player.gold < n.needGold){
+    addLog(`银两不足，无法邀请${n.name}`);
     questLeave();
     return;
   }
-  player.gold -= currentQuestNpc.needGold;
+  player.gold -= n.needGold;
   const roll = Math.random();
-  if(roll <= currentQuestNpc.successRate){
-    player.partners.push(JSON.parse(JSON.stringify(currentQuestNpc)));
-    addLog(`🎉 ${currentQuestNpc.name}愿意加入你的队伍！去伙伴面板上阵吧`);
+  if(roll <= n.successRate){
+    player.partners.push(JSON.parse(JSON.stringify(n)));
+    addLog(`🎉 ${n.name}愿意加入你的队伍！去伙伴面板上阵吧`);
   }else{
-    addLog(`${currentQuestNpc.name}摇了摇头：${currentQuestNpc.refuseText}`);
+    addLog(`${n.name}摇了摇头：${n.refuseText}`);
   }
   questLeave();
   saveGame();refreshUI();
 }
+// 宝箱奖励：银两 + 药材/残页/装备
+function chestReward(){
+  const gold = 30 + Math.floor(Math.random()*40) + player.lv*3;
+  player.gold += gold;
+  let extra = "";
+  const roll = Math.random();
+  if(roll < 0.4){
+    const h = CONFIG.herb_list[Math.floor(Math.random()*2)];
+    player.bag.herb.push(JSON.parse(JSON.stringify(h)));
+    extra = `、药材【${h.name}】`;
+  }else if(roll < 0.7){
+    const g = ["white","blue","purple"][Math.min(2, Math.floor(player.lv/15))];
+    player.bag.scroll[g] += 3;
+    extra = `、${CONFIG.grade_name[g]}残页×3`;
+  }else{
+    const e = dropEquip(Math.random()<0.5 ? "white" : "blue");
+    if(e){ player.bag.equip.push(e); extra = `、【${e.name}】`; }
+  }
+  addLog(`📦 开启宝箱：银两+${gold}${extra}`);
+  saveGame(); refreshUI();
+}
+// 选择专精分支
+function chooseSpec(key){
+  if(!CONFIG.spec_def[key]) return;
+  player.spec = key;
+  const sd = CONFIG.spec_def[key];
+  addLog(`🧙 隐士点头：「【${sd.name}】，望你精益求精。」你习得专精【${sd.name}】——${sd.desc}`);
+  questLeave();
+  saveGame(); refreshUI();
+}
+// 已选专精后隐士赠礼
+function hermitGift(){
+  const g = ["white","blue","purple"][Math.min(2, Math.floor(player.lv/15))];
+  player.bag.scroll[g] += 2;
+  const h = CONFIG.herb_list[Math.floor(Math.random()*CONFIG.herb_list.length)];
+  player.bag.herb.push(JSON.parse(JSON.stringify(h)));
+  addLog(`🧙 隐士赠你${CONFIG.grade_name[g]}残页×2、【${h.name}】，嘱你好生修炼。`);
+  saveGame(); refreshUI();
+}
 function questLeave(){
   document.getElementById("questBox").classList.add("hide");
-  currentQuestNpc = null;
+  currentQuest = null;
 }
 
 // ========== 伙伴面板 ==========
@@ -478,9 +736,29 @@ const MAP_POS = [
   {x:0.88,y:0.32}, {x:0.82,y:0.62}
 ];
 
+function refreshWildSpawns(){
+  wildSpawns = [];
+  const count = 4;
+  for(let i=0;i<count;i++){
+    let x=0.5, y=0.5, tries=0;
+    do{
+      x = 0.12 + Math.random()*0.76;
+      y = 0.15 + Math.random()*0.7;
+      tries++;
+    }while(tries<10 && MAP_POS.some(p=>Math.hypot(p.x-x,p.y-y)<0.12));
+    const mob = pickWildMob(player.lv);
+    wildSpawns.push({name:mob.name, x, y, alive:true, mob});
+  }
+}
+function removeWildByName(name){
+  wildSpawns.forEach(s=>{ if(s.alive && s.name===name) s.alive=false; });
+}
+
 function renderMapCanvas(){
   const cv = document.getElementById("mapCanvas");
   if(!cv) return;
+  const aliveCount = wildSpawns.filter(s=>s.alive).length;
+  if(!wildSpawns.length || aliveCount < 2) refreshWildSpawns();
   const c = cv.getContext("2d");
   const w = cv.width, h = cv.height;
 
@@ -533,6 +811,23 @@ function renderMapCanvas(){
     c.fillStyle = unlocked ? "#7f7" : "#555";
     c.fillText(`Lv${d.level_min}-${d.level_max}`, x, y + 22);
   });
+
+  // 野外明雷怪
+  wildSpawns.forEach(s=>{
+    if(!s.alive) return;
+    const x = s.x*w, y = s.y*h;
+    c.beginPath();
+    c.arc(x, y, 7, 0, Math.PI*2);
+    c.fillStyle = "#e08a3b";
+    c.fill();
+    c.strokeStyle = "#f88";
+    c.lineWidth = 1.5;
+    c.stroke();
+    c.textAlign = "center";
+    c.font = "10px sans-serif";
+    c.fillStyle = "#fca";
+    c.fillText(s.name, x, y - 12);
+  });
 }
 
 document.addEventListener("click", e=>{
@@ -541,10 +836,14 @@ document.addEventListener("click", e=>{
     const rect = cv.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * cv.width / rect.width;
     const my = (e.clientY - rect.top) * cv.height / rect.height;
+    let hit = false;
+
+    // 1) 秘境点
     CONFIG.dungeon_list.forEach((d, i)=>{
       const p = MAP_POS[i];
       const dx = mx - p.x*cv.width, dy = my - p.y*cv.height;
       if(dx*dx + dy*dy < 22*22){
+        hit = true;
         if(player.lv >= d.level_min && player.lv <= d.level_max){
           startDungeon(d);
         }else{
@@ -552,6 +851,25 @@ document.addEventListener("click", e=>{
         }
       }
     });
+
+    // 2) 明雷怪
+    if(!hit){
+      for(const s of wildSpawns){
+        if(!s.alive) continue;
+        const dx = mx - s.x*cv.width, dy = my - s.y*cv.height;
+        if(dx*dx + dy*dy < 18*18){
+          hit = true;
+          startBattle(s.mob, "野外");
+          break;
+        }
+      }
+    }
+
+    // 3) 点空地：概率随机遭遇
+    if(!hit && Math.random() < 0.15){
+      addLog("你在野外行走，突然遭遇埋伏！");
+      startWildBattle();
+    }
   }
 });
 
@@ -568,170 +886,647 @@ function renderMapList(){
       wrap.appendChild(div);
     }
   });
+  // 野外闲逛
+  const wild = document.createElement("div");
+  wild.className = "item";
+  wild.innerText = "🌿 野外闲逛（随机遭遇山贼野兽，掉落残页银两）";
+  wild.onclick = ()=>startWildBattle();
+  wrap.appendChild(wild);
+  // 可挑战 BOSS
+  CONFIG.boss_list.forEach(b=>{
+    if(player.lv >= b.lv - 5 && player.lv <= b.lv + 10){
+      const div = document.createElement("div");
+      div.className = "item grade-red";
+      div.innerText = `👹 ${b.name} Lv${b.lv}｜${b.desc}`;
+      div.onclick = ()=>startBattle(Object.assign({}, b, {isBoss:true}), "BOSS挑战");
+      wrap.appendChild(div);
+    }
+  });
 }
+
+// ========== 战斗启动 ==========
+function makeEnemy(cfg){
+  return {
+    name:cfg.name, hp:cfg.hp, maxHp:cfg.hp,
+    atk: cfg.atk || Math.floor(cfg.hp/12),
+    def: cfg.def || Math.floor(cfg.hp/28),
+    lv: cfg.lv || player.lv,
+    qi:0, debuff:[], buff:[],
+    skill:cfg.skill || "普攻", state:cfg.state || "",
+    dropGrade:cfg.dropGrade || ["white"],
+    isBoss:!!cfg.isBoss, aiMode:"normal"
+  };
+}
+function startBattle(cfg, sceneName){
+  fxReset();
+  inBattle = true;
+  enemy = makeEnemy(cfg);
+  // 战棋初始站位
+  player.pos = {x:1, y:2};
+  enemy.pos = {x:6, y:1};
+  player.partnerPos = player.activePartner ? {x:1, y:1} : null;
+  player.qi = 20;   // 开场玩家略占先手机会
+  enemy.qi = 0;
+  currentScene = sceneName || "江湖";
+  addLog(`=== 【${currentScene}】遭遇${enemy.isBoss ? "BOSS " : ""}【${enemy.name}】===`);
+  refreshUI();
+  renderSkillBtn();
+}
+// 按等级挑可挑战 BOSS
+function pickBossForLv(lv){
+  const pool = CONFIG.boss_list.filter(b=>b.lv <= lv + 5);
+  return pool.length ? pool[pool.length-1] : null;
+}
+// 按等级挑野外怪模板并随等级成长
+function pickWildMob(lv){
+  const pool = CONFIG.wild_mobs.filter(m=>m.lv <= lv + 5);
+  const m = pool.length ? pool[pool.length-1] : CONFIG.wild_mobs[0];
+  const scale = 1 + Math.max(0, lv - m.lv) * 0.05;
+  return {
+    name:m.name, hp:Math.round(m.hp*scale), atk:Math.round(m.atk*scale),
+    def:m.def, lv:lv, dropGrade:m.dropGrade
+  };
+}
+function startWildBattle(){ startBattle(pickWildMob(player.lv), "野外"); }
 
 // ========== 进入秘境 ==========
 function startDungeon(dun){
   if(triggerQuest()) return;
   currentDungeon = dun;
-  fxReset();
-  inBattle=true;
-  enemy = {
-    name:dun.enemy,hp:dun.hp,maxHp:dun.hp,
-    atk: Math.floor(dun.hp / 12),
-    debuff:[],
-    aiMode:"normal"
-  };
-  addLog(`=== 进入【${dun.name}】，遭遇敌人【${enemy.name}】===`);
-  refreshUI();
-  renderSkillBtn();
+  let cfg = {name:dun.enemy, hp:dun.hp, dropGrade:dun.dropGrade};
+  const boss = pickBossForLv(player.lv);
+  if(boss && Math.random() < 0.2){
+    cfg = Object.assign({}, boss, {isBoss:true});
+    addLog("⚠ 一股强大的气息逼近……");
+  }
+  startBattle(cfg, dun.name);
+}
+function clearBattleStatus(){
+  if(player){ player.debuff = []; player.buff = []; player.comboCharge = 0; player.qi = 0; }
+  if(enemy){ enemy.qi = 0; }
+  lastPlayerQiReady = null;
 }
 function exitBattle(){
   battleBusy = false;
   inBattle=false;
   enemy=null;
   currentDungeon=null;
+  clearBattleStatus();
   fxReset();
   addLog("退出战斗");
   refreshUI();
 }
 
-// ========== Debuff ==========
-function runDebuffTurn(target,isPlayer){
-  const newDebuff = [];
-  target.debuff.forEach(deb=>{
-    const cfg = CONFIG.state_def[deb.type];
-    if(!cfg) return;
-    if(cfg.type === "dot"){
-      target.hp -= cfg.dmg;
-      addLog(`${isPlayer?"你":enemy.name}受到【${cfg.name}】伤害 ${cfg.dmg}`);
-    }else if(cfg.type === "dot_mp"){
-      target.mp -= cfg.dmg;
-      addLog(`${isPlayer?"你":enemy.name}受到【${cfg.name}】内力损耗 ${cfg.dmg}`);
-    }else if(cfg.type === "dot_both"){
-      target.hp -= cfg.dmg;
-      target.mp -= cfg.mpDmg;
-      addLog(`${isPlayer?"你":enemy.name}受到【${cfg.name}】气血${cfg.dmg}、内力${cfg.mpDmg}`);
-    }
-    deb.turn--;
-    if(deb.turn>0) newDebuff.push(deb);
-  })
-  target.debuff = newDebuff;
+// ========== 状态(Debuff/Buff) ==========
+function hasState(target,type){ return target.debuff && target.debuff.some(x=>x.type===type); }
+function hasBuff(target,type){ return target.buff && target.buff.some(x=>x.type===type); }
+function stateStack(target,type){ const d=target.debuff.find(x=>x.type===type); return d?d.stack:0; }
+function clampTarget(target){
+  target.hp = Math.max(0, Math.min(target.maxHp, target.hp));
+  target.mp = Math.max(0, Math.min(target.maxMp, target.mp));
 }
-function applyState(target,stateStr){
-  if(!stateStr) return;
-  const states = stateStr.split(",");
-  states.forEach(st=>{
-    if(!CONFIG.state_def[st]) return;
-    const has = target.debuff.find(x=>x.type===st);
-    if(has) has.turn +=2;
-    else target.debuff.push({type:st,turn:3});
-  })
+function targetName(target,isPlayer){ return target.name || (isPlayer?"你":"敌人"); }
+function isTargetPlayer(target){ return target === player; }
+
+// 状态数值随等级成长 + 层数叠加系数
+function dotLv(){ return (player && player.lv) ? player.lv : 1; }
+function dotAmount(cfg, stack){
+  const lvScale = 1 + (dotLv() - 1) * 0.06;
+  const stackScale = 1 + 0.35 * ((stack||1) - 1);
+  return Math.round((cfg.dmg||0) * lvScale * stackScale);
+}
+function dotMpAmount(cfg, stack){
+  const lvScale = 1 + (dotLv() - 1) * 0.06;
+  const stackScale = 1 + 0.35 * ((stack||1) - 1);
+  return Math.round((cfg.mpDmg||0) * lvScale * stackScale);
+}
+
+// 回合结算：dot 扣血扣内、buff 回复、回合递减
+function runDebuffTurn(target, isPlayer){
+  if(!target) return;
+  const label = targetName(target, isPlayer);
+
+  // 持续减益结算
+  target.debuff = target.debuff.filter(deb=>{
+    const cfg = CONFIG.state_def[deb.type];
+    if(!cfg) return false;
+    const stack = deb.stack || 1;
+    let keep = true;
+
+    if(cfg.type === "dot"){
+      const amt = dotAmount(cfg, stack);
+      target.hp -= amt;
+      addLog(`${label}受到【${cfg.name}】伤害 ${amt}`);
+    }else if(cfg.type === "dot_mp"){
+      const amt = dotMpAmount(cfg, stack);
+      target.mp -= amt;
+      addLog(`${label}【${cfg.name}】损耗内力 ${amt}`);
+    }else if(cfg.type === "dot_both"){
+      const h = dotAmount(cfg, stack);
+      const m = dotMpAmount(cfg, stack);
+      target.hp -= h; target.mp -= m;
+      addLog(`${label}【${cfg.name}】气血-${h}、内力-${m}`);
+    }else if(cfg.delayedInjury){
+      if(deb.turn <= 1){
+        const burst = 15 + player.lv * 2;
+        target.hp -= burst;
+        addLog(`${label}体内迟发毒伤爆发！重创 ${burst}`);
+      }
+    }
+
+    deb.turn--;
+    if(deb.turn <= 0) keep = false;
+    clampTarget(target);
+    return keep;
+  });
+
+  // 增益buff结算：持续回血/回内
+  target.buff = target.buff.filter(bf=>{
+    const cfg = CONFIG.state_def[bf.type];
+    if(!cfg) return false;
+    if(cfg.healRegen){
+      const amt = Math.round(target.maxHp * cfg.healRegen);
+      target.hp = Math.min(target.maxHp, target.hp + amt);
+      addLog(`${label}凭【${cfg.name}】回复 ${amt} 气血`);
+    }
+    if(cfg.mpRegen){
+      const amt = Math.round(target.maxMp * cfg.mpRegen);
+      target.mp = Math.min(target.maxMp, target.mp + amt);
+    }
+    bf.turn--;
+    clampTarget(target);
+    return bf.turn > 0;
+  });
+}
+
+// 格式化状态面板文字（减益 + 增益，叠层标注）
+function formatStates(target){
+  if(!target) return "";
+  const parts = [];
+  (target.debuff||[]).forEach(d=>{
+    const c = CONFIG.state_def[d.type];
+    if(c) parts.push(c.name + (d.stack>1 ? `×${d.stack}` : ""));
+  });
+  (target.buff||[]).forEach(b=>{
+    const c = CONFIG.state_def[b.type];
+    if(c) parts.push("【"+c.name+"】");
+  });
+  return parts.join("、");
+}
+
+// 读取目标身上所有减益/增益对攻防集气的修正
+function getStateMod(target){
+  const mod = {atkMul:1, defMul:1, qiMul:1, reflect:0, dodge:0, lockMp:false, antiCold:false, comboBonus:0, stable:false};
+  if(!target) return mod;
+  (target.debuff||[]).forEach(d=>{
+    const cfg = CONFIG.state_def[d.type];
+    if(!cfg) return;
+    if(cfg.atkDown) mod.atkMul *= (1 - cfg.atkDown);
+    if(cfg.defDown) mod.defMul *= (1 - cfg.defDown);
+    if(cfg.qiDown) mod.qiMul *= (1 - cfg.qiDown);
+    if(cfg.lockMp) mod.lockMp = true;
+  });
+  (target.buff||[]).forEach(b=>{
+    const cfg = CONFIG.state_def[b.type];
+    if(!cfg) return;
+    if(cfg.atkUp) mod.atkMul *= (1 + cfg.atkUp);
+    if(cfg.defUp) mod.defMul *= (1 + cfg.defUp);
+    if(cfg.reflect) mod.reflect = Math.max(mod.reflect, cfg.reflect);
+    if(cfg.dodge) mod.dodge = Math.max(mod.dodge, cfg.dodge);
+    if(cfg.antiCold) mod.antiCold = true;
+    if(cfg.comboBonus) mod.comboBonus += cfg.comboBonus;
+    if(cfg.stable) mod.stable = true;
+  });
+  return mod;
+}
+// 施加状态；source 为出招方（偷内等需要回流内力时使用）
+function applyState(target, stateStr, opts){
+  if(!target || !stateStr) return;
+  opts = opts || {};
+  const source = opts.source || null;
+  const parts = stateStr.split(",").map(s=>s.trim()).filter(Boolean);
+  parts.forEach(raw=>{
+    const type = CONFIG.state_alias[raw] || raw;
+    const cfg = CONFIG.state_def[type];
+    if(!cfg) return;
+
+    // 即时触发类：不入持续数组，当场结算
+    if(cfg.type === "instant"){
+      // 偷内力：目标内力转给来源
+      if(cfg.stealMp && source){
+        const lv = (source.lv || (player && player.lv) || 1);
+        const amt = Math.min(target.mp, cfg.stealMp + lv);
+        if(amt>0){
+          target.mp -= amt;
+          source.mp = Math.min(source.maxMp, source.mp + amt);
+          addLog(`【夺内】从${targetName(target,!isTargetPlayer(target))}身上抽走 ${amt} 内力`);
+        }
+      }
+      // 净化
+      if(cfg.purify){
+        if(cfg.purify === "all"){ target.debuff = []; addLog(`【净化】清除全部负面状态`); }
+        else if(cfg.purify === "poison"){
+          const before = target.debuff.length;
+          target.debuff = target.debuff.filter(d=>!["poison","cold_poison","poison_delay_injury"].includes(d.type));
+          addLog(before > target.debuff.length ? `【纯阳驱毒】清除了身上的毒素` : `你身上本无毒素`);
+        }
+        else { const last = target.debuff.pop(); if(last) addLog(`【涤秽】驱散了【${CONFIG.state_def[last.type].name}】`); }
+      }
+      // 疗伤（按比例回血）
+      if(cfg.heal){
+        const amt = Math.round(target.maxHp * cfg.heal);
+        target.hp = Math.min(target.maxHp, target.hp + amt);
+        addLog(`【疗伤】回复 ${amt} 气血`);
+      }
+      clampTarget(target);
+      return;
+    }
+
+    // 增益buff
+    if(cfg.type === "buff"){
+      const old = target.buff.find(x=>x.type===type);
+      if(old) old.turn = 3;
+      else target.buff.push({type, turn:3});
+      return;
+    }
+
+    // 减益 / dot 类
+    const old = target.debuff.find(x=>x.type===type);
+    if(old){
+      old.stack = Math.min(5, (old.stack||1) + 1);
+      old.turn = 3;
+    }else{
+      target.debuff.push({type, turn:3, stack:1});
+    }
+  });
 }
 
 // ========== 伙伴出手 ==========
 function partnerAttack(){
-  if(!player.activePartner) return;
+  if(!player.activePartner || !enemy) return;
   const p = player.activePartner;
-  const dmg = p.atk + Math.floor(Math.random()*10);
+  const eDef = enemy.def || 0;
+  const dmg = Math.max(1, p.atk + Math.floor(Math.random()*10) - Math.floor(eDef*0.2));
   enemy.hp -= dmg;
+  clampTarget(enemy);
   addLog(`🤝伙伴【${p.name}】施展【${p.skill}】，造成 ${dmg} 伤害！`);
   fxDamage("enemy", dmg, "#9cf");
 }
 
 // ========== 战斗 ==========
+// 判断是否兵刃类武学（受封兵刃影响）
+function isWeaponSkill(skill){
+  return /剑|刀|棍|枪|针|镖|箭|戟/.test(skill.name);
+}
+
+function calcPlayerDamage(skill, stat){
+  let dmgBonus = 1;
+  // 本门套路加成
+  if(skill.style && currentSchool.wugong.find(w=>w.style === skill.style)) dmgBonus *= 1.25;
+  // 装备适配套路：武器套路与出招套路一致，额外增伤
+  const wpn = player.wearWeapon;
+  if(wpn && wpn.style && wpn.style !== "other" && wpn.style === skill.style) dmgBonus *= 1.15;
+  // 专精分支加成
+  if(player.spec === "du" && /poison|cold_poison/.test(skill.state||"")) dmgBonus *= 1.15;
+  if(player.spec === "anqi" && /针|镖|箭|飞刀|暗器|石|弹/.test(skill.name)) dmgBonus *= 1.15;
+  if(player.spec === "quanjiao" && /掌|拳|指|爪|臂|腿|脚/.test(skill.name)) dmgBonus *= 1.15;
+  // 伙伴夹击围殴加成
+  if(partnerPinching()) dmgBonus *= 1.15;
+  // 敌方防御减伤
+  const eStat = calcEnemyStat();
+  const defReduce = eStat.def * 0.3;
+  // 对毒系目标增伤
+  if(/poison|cold_poison/.test(skill.state||"") || hasState(enemy,"poison") || hasState(enemy,"cold_poison")){
+    if(/dmg_vs_poison|poison/.test(skill.state||"")) dmgBonus *= 1.15;
+  }
+  // 自损换伤
+  let selfCost = 0;
+  if(/self_hurt_dmg/.test(skill.state||"")){
+    selfCost = Math.round(player.maxHp * 0.08);
+    dmgBonus *= 1.4;
+  }
+  // 伤害浮动
+  const mod = stat.mod;
+  const rand = mod.stable ? 18 : Math.floor(Math.random()*22 +10);
+  let raw = (stat.atk + rand) * dmgBonus - defReduce;
+  let dmg = Math.max(1, Math.floor(raw));
+  return {dmg, selfCost};
+}
+
+// 自然回内；被【封内】锁住则不回复
+function regenMp(){
+  const pMod = calcPlayerStat().mod;
+  if(!pMod.lockMp){
+    player.mp = Math.min(player.maxMp, player.mp + Math.round(player.maxMp*0.05));
+  }else{
+    addLog("【封内】经脉被锁，内力无法自然回复");
+  }
+}
+
 function useSkill(skill){
   if(!inBattle || battleBusy) return;
+  if((player.qi||0) < 100){ addLog("集气未满，无法出招！"); return; }
+  // 封兵刃判定
+  if(hasState(player,"seal_weapon") && isWeaponSkill(skill)){
+    addLog("你的兵刃招式被封住了，无法施展！");
+    return;
+  }
+  // 封武学判定：概率被封印
+  if(hasState(player,"seal_skill") && Math.random() < 0.35){
+    addLog(`【${skill.name}】被经脉滞涩封住，未能出手！`);
+    return;
+  }
+  const selfCast = ["self","team"].includes(skill.range);
+  // 战棋射程校验（自身/团队招式不限距离）
+  if(!selfCast && enemy && enemy.pos){
+    const dist = manhattan(player.pos, enemy.pos);
+    const range = skillRange(skill);
+    if(dist > range){
+      addLog(`距离太远（${dist} 格），【${skill.name}】射程 ${range} 格，无法命中！先走位拉近。`);
+      return;
+    }
+  }
   if(player.mp < skill.mpCost){ addLog("内力不足！"); return; }
   battleBusy = true;
   player.mp -= skill.mpCost;
+  player.qi = 0;   // 出招后集气清空，重新积攒
 
   const stat = calcPlayerStat();
-  let dmgBonus = 1;
-  if(skill.style && currentSchool.wugong.find(w=>w.style === skill.style)) dmgBonus = 1.25;
 
-  let baseDmg = Math.floor((stat.atk + Math.floor(Math.random()*22 +10)) * dmgBonus);
-  audioAttack.play();
-  addLog(`你施展【${skill.name}】消耗${skill.mpCost}内力，造成${baseDmg}伤害！套路加成${dmgBonus>1?"生效":""}`);
-  enemy.hp -= baseDmg;
-  fxCast(skill.style);
-  fxDamage("enemy", baseDmg);
-  if(skill.state) applyState(enemy, skill.state);
-  refreshUI();
+  if(selfCast){
+    // 自身/团队增益类武学：不攻击敌人，状态挂在自己身上
+    audioAttack.play();
+    fxCast(skill.style);
+    addLog(`你运功施展【${skill.name}】，护住周身`);
+    if(skill.state) applyState(player, skill.state, {source:player});
+    clampTarget(player);
+    refreshUI();
+  }else{
+    const {dmg, selfCost} = calcPlayerDamage(skill, stat);
 
+    // 自损气血
+    if(selfCost > 0){
+      player.hp -= selfCost;
+      clampTarget(player);
+      addLog(`【舍身】自损 ${selfCost} 气血，招式威力大涨`);
+    }
+
+    audioAttack.play();
+    fxCast(skill.style);
+
+    // 敌人闪避判定
+    const eMod = calcEnemyStat().mod;
+    if(Math.random() < eMod.dodge){
+      addLog(`${enemy.name}身形一晃，避开了【${skill.name}】！`);
+      fxText("enemy", "闪避", "#9cf");
+    }else{
+      enemy.hp -= dmg;
+      addLog(`你施展【${skill.name}】消耗${skill.mpCost}内力，造成${dmg}伤害！`);
+      fxDamage("enemy", dmg);
+      // 连击/变招追加一段
+      if(/combo|copy_skill/.test(skill.state||"")){
+        const comboDmg = Math.max(1, Math.floor(dmg * 0.5));
+        enemy.hp -= comboDmg;
+        addLog(`【连击】追打一段，再造成 ${comboDmg} 伤害！`);
+        fxDamage("enemy", comboDmg, "#f9c");
+      }
+    }
+
+    // 施加状态（source=player，供偷内回流）
+    if(skill.state) applyState(enemy, skill.state, {source:player});
+    clampTarget(enemy);
+    refreshUI();
+  }
+
+  // 玩家行动结算：伙伴协助 → 持续状态 → 回内 → 胜负判定；之后交还半即时节奏
   setTimeout(()=>{
     if(!inBattle){ battleBusy = false; return; }
 
     if(player.activePartner){
       partnerAttack();
+      partnerApproach();
       refreshUI();
     }
 
-    setTimeout(()=>{
-      if(!inBattle){ battleBusy = false; return; }
-      if(enemy.hp <= 0){ winBattle(); battleBusy = false; return; }
+    runDebuffTurn(player, true);
+    runDebuffTurn(enemy, false);
+    regenMp();
+    clampTarget(player);
+    clampTarget(enemy);
+    refreshUI();
+    if(enemy.hp <= 0){ winBattle(); battleBusy = false; return; }
 
-      runDebuffTurn(player, true);
-      runDebuffTurn(enemy, false);
-      refreshUI();
-      if(enemy.hp <= 0){ winBattle(); battleBusy = false; return; }
-
-      enemyTurn();
-
-      if(player.hp <= 0){
-        addLog("你战败了！");
-        player.hp = Math.floor(player.maxHp*0.3);
-        fxText("player", "战败", "#f66");
-      }
-      refreshUI();
-      saveGame();
-      battleBusy = false;
-    }, 350);
+    battleBusy = false;   // 敌人由集气 tick 满槽后自动行动
   }, 350);
 }
 
+// 自动战斗：朝敌人走近一格
+function autoApproach(){
+  if(!enemy.pos || !player.pos) return;
+  let {x,y} = player.pos;
+  const dx = Math.sign(enemy.pos.x - x);
+  const dy = Math.sign(enemy.pos.y - y);
+  if(dx !== 0 && !occupiedBy(x+dx, y)) x += dx;
+  else if(dy !== 0 && !occupiedBy(x, y+dy)) y += dy;
+  player.pos = {x,y};
+}
+// 自动战斗：挑选可用技能
+function autoUseSkill(){
+  const usable = player.learnSkill.filter(sk=>{
+    if(player.mp < sk.mpCost) return false;
+    if(hasState(player,"seal_weapon") && isWeaponSkill(sk)) return false;
+    return true;
+  });
+  if(usable.length === 0) return;
+  const rank = g => CONFIG.grade_order.indexOf(g.grade);
+  usable.sort((a,b)=>rank(b)-rank(a));
+  const inRange = usable.filter(sk=>{
+    if(["self","team"].includes(sk.range)) return true;
+    return manhattan(player.pos, enemy.pos) <= skillRange(sk);
+  });
+  const atk = (inRange.length?inRange:usable).find(s=>!["self","team"].includes(s.range));
+  const pick = atk || usable[0];
+  // 攻击技超距时先走近，不出招
+  if(atk && !["self","team"].includes(pick.range) &&
+     manhattan(player.pos, enemy.pos) > skillRange(pick)){
+    autoApproach();
+    return;
+  }
+  useSkill(pick);
+}
+
+function toggleAuto(){
+  autoBattle = !autoBattle;
+  const btn = document.getElementById("autoBtn");
+  if(btn) btn.innerText = "自动战斗：" + (autoBattle ? "开" : "关");
+  addLog(autoBattle ? "自动战斗已开启，集气满后自动出招" : "自动战斗已关闭");
+}
+
+// 半即时集气 tick
+function battleQiTick(){
+  if(!inBattle || !enemy){ return; }
+  const pStat = calcPlayerStat();
+  const eStat = calcEnemyStat();
+  player.qi = Math.min(100, (player.qi||0) + pStat.qiSpeed * QI_PER_TICK);
+  enemy.qi  = Math.min(100, (enemy.qi||0) + eStat.qiSpeed * QI_PER_TICK);
+
+  if(!battleBusy){
+    if(enemy.qi >= 100){
+      enemyAction();
+    }else if(player.qi >= 100 && autoBattle){
+      autoUseSkill();
+    }
+  }
+  // 集气满/空状态变化时刷新技能按钮可用性
+  const qiReady = (player.qi||0) >= 100;
+  if(qiReady !== lastPlayerQiReady){
+    lastPlayerQiReady = qiReady;
+    if(inBattle) renderSkillBtn();
+  }
+  refreshQiUI();
+}
+
+function refreshQiUI(){
+  const pq = Math.round(player.qi||0);
+  const eq = enemy ? Math.round(enemy.qi||0) : 0;
+  const pEl=document.getElementById("playerQi"), pBar=document.getElementById("playerQiBar");
+  const eEl=document.getElementById("enemyQi"), eBar=document.getElementById("enemyQiBar");
+  if(pEl) pEl.innerText = pq;
+  if(pBar) pBar.style.width = pq+"%";
+  if(eEl) eEl.innerText = eq;
+  if(eBar) eBar.style.width = eq+"%";
+}
+
+// 敌人满槽后由 tick 驱动出手
+function enemyAction(){
+  if(!enemy || battleBusy) return;
+  battleBusy = true;
+  enemy.qi = 0;
+  enemyTurn();
+  setTimeout(()=>{
+    if(!inBattle){ battleBusy = false; return; }
+    runDebuffTurn(player, true);
+    runDebuffTurn(enemy, false);
+    clampTarget(player);
+    clampTarget(enemy);
+    partnerApproach();
+    if(player.hp <= 0){
+      addLog("你战败了！");
+      player.hp = Math.floor(player.maxHp*0.3);
+      player.mp = Math.floor(player.maxMp*0.3);
+      player.qi = 0;
+      fxText("player", "战败", "#f66");
+    }
+    refreshUI();
+    saveGame();
+    battleBusy = false;
+  }, 350);
+}
+
+// 敌人近战逼近玩家（战棋走位）
+function enemyApproach(){
+  if(!enemy.pos || !player.pos) return;
+  let dist = manhattan(enemy.pos, player.pos);
+  if(dist <= 1) return;
+  let {x,y} = enemy.pos;
+  const dx = Math.sign(player.pos.x - x);
+  const dy = Math.sign(player.pos.y - y);
+  let steps = ENEMY_MOVE;
+  while(dist > 1 && steps > 0){
+    if(dx !== 0 && !occupiedBy(x+dx, y)){ x += dx; }
+    else if(dy !== 0 && !occupiedBy(x, y+dy)){ y += dy; }
+    else break;
+    dist = manhattan({x,y}, player.pos);
+    steps--;
+  }
+  enemy.pos = {x,y};
+  addLog(`${enemy.name}迈步向你逼近`);
+}
+
 function enemyTurn(){
-  const stat = calcPlayerStat();
+  if(!enemy) return;
+  const pStat = calcPlayerStat();
+  const eStat = calcEnemyStat();
   const rand = Math.random();
-  if(rand <0.25){
-    const debList = ["bleed","poison","internal_injury"];
+
+  // AI 1：运功施加负面状态（30%）
+  if(rand < 0.30){
+    const debList = ["bleed","poison","internal_injury","slow_qi"];
     const pick = debList[Math.floor(Math.random()*debList.length)];
-    applyState(player,pick);
-    addLog(`${enemy.name}运功，对你施加【${CONFIG.state_def[pick].name}】！`);
-  }else if(rand<0.4){
-    addLog(`${enemy.name}凝神防御！`);
-  }else{
-    let edmg = enemy.atk + Math.floor(Math.random()*12);
-    const hasRebound = player.debuff.find(d=>d.type==="rebound");
-    if(hasRebound){
-      const reflectDmg = Math.floor(edmg * 0.4);
+    if(pick === "cold_poison" && pStat.mod.antiCold){
+      addLog("你阳躯深厚，寒毒被内力震散！");
+    }else{
+      applyState(player, pick);
+      addLog(`${enemy.name}运功，对你施加【${CONFIG.state_def[pick].name}】！`);
+    }
+  }
+  // AI 2：凝神防御，临时提升自身减伤（12%）
+  else if(rand < 0.42){
+    applyState(enemy, "def_up");
+    addLog(`${enemy.name}凝神聚气，防御力一时大涨！`);
+  }
+  // AI 3：普通攻击（58%）
+  else{
+    enemyApproach();   // 近战先逼近
+    // 玩家闪避判定
+    if(Math.random() < pStat.mod.dodge){
+      addLog(`你足尖一点，避开了${enemy.name}的攻势！`);
+      fxText("player", "闪避", "#9f9");
+      clampTarget(player);
+      return;
+    }
+    let edmg = eStat.atk + Math.floor(Math.random()*12);
+    // 反弹（来自玩家 buff）
+    if(pStat.mod.reflect > 0){
+      const reflectDmg = Math.floor(edmg * pStat.mod.reflect);
       enemy.hp -= reflectDmg;
       addLog(`【卸力反弹】反弹${reflectDmg}伤害给敌人！`);
       fxDamage("enemy", reflectDmg, "#6cf");
     }
-    edmg = Math.max(1, edmg - stat.def*0.3);
+    edmg = Math.max(1, edmg - Math.floor(pStat.def * 0.3));
     player.hp -= edmg;
     fxDamage("player", edmg);
     audioHit.play();
     addLog(`${enemy.name}攻击你，造成${edmg}伤害！`);
   }
+  clampTarget(player);
+  clampTarget(enemy);
 }
 
+// 按品级随机掉落一件装备
+function dropEquip(grade){
+  const pool = CONFIG.equip_pool.filter(e=>e.grade===grade);
+  if(!pool.length) return null;
+  return JSON.parse(JSON.stringify(pool[Math.floor(Math.random()*pool.length)]));
+}
 function winBattle(){
   battleBusy = false;
   fxEnemyDie();
   audioWin.play();
-  addLog(`✅ 击败【${enemy.name}】！`);
-  const dun = CONFIG.dungeon_list.find(d=>d.enemy === enemy.name);
-  const grade = dun.dropGrade[Math.floor(Math.random()*dun.dropGrade.length)];
-  player.bag.scroll[grade] += 1;
-  player.gold += 30 + player.lv * 5;
-  addLog(`获得【${CONFIG.grade_name[grade]}残页】x1，银两+${30+player.lv*5}`);
+  const isBoss = !!enemy.isBoss;
+  addLog(`✅ 击败【${enemy.name}】！${isBoss?"（BOSS 挑战）":""}`);
+  const grades = enemy.dropGrade || ["white"];
+  const grade = grades[Math.floor(Math.random()*grades.length)];
+  let scrollCount = 1;
+  let gold = 30 + player.lv * 5;
+  if(isBoss){ scrollCount = 2; gold += 100; }
+  player.bag.scroll[grade] += scrollCount;
+  player.gold += gold;
+  addLog(`获得【${CONFIG.grade_name[grade]}残页】x${scrollCount}，银两+${gold}`);
+  // 装备掉落：普通怪 30% 掉同品级，BOSS 必掉紫品以上
+  const equipChance = isBoss ? 1 : 0.3;
+  if(Math.random() < equipChance){
+    const eg = isBoss ? ["purple","red","gold"][Math.floor(Math.random()*3)] : grade;
+    const eq = dropEquip(eg);
+    if(eq){ player.bag.equip.push(eq); addLog(`🗡 掉落装备【${eq.name}】（${CONFIG.grade_name[eq.grade]}）！`); }
+  }
+  removeWildByName(enemy.name);
   tryUnlockSkill();
   player.lv += 1;
   player.maxHp +=15; player.hp = player.maxHp;
   player.maxMp +=6; player.mp = player.maxMp;
   player.baseAtk +=2; player.baseDef +=1;
+  clearBattleStatus();
   inBattle=false; enemy=null;
   saveGame();
   refreshUI();
@@ -750,13 +1545,139 @@ function tryUnlockSkill(){
   }
 }
 
+// ========== 自由秘籍参悟（不绑定门派） ==========
+function learnFreeSkill(sk){
+  if(player.learnSkill.find(x=>x.name===sk.name)){ addLog("已习得【"+sk.name+"】"); return; }
+  const need = CONFIG.scrollNeed[sk.grade];
+  if(player.bag.scroll[sk.grade] < need){
+    addLog(`残卷不足：【${sk.name}】需 ${CONFIG.grade_name[sk.grade]}残页 ${need} 张`); return;
+  }
+  player.bag.scroll[sk.grade] -= need;
+  player.learnSkill.push(JSON.parse(JSON.stringify(sk)));
+  addLog(`🎉 参悟秘籍成功，习得【${sk.name}】`);
+  saveGame(); refreshUI();
+}
+function renderFreeSkillList(){
+  const wrap = document.getElementById("freeSkillList");
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  CONFIG.free_wugong.forEach(sk=>{
+    const owned = player.learnSkill.find(x=>x.name===sk.name);
+    const need = CONFIG.scrollNeed[sk.grade];
+    const cnt = player.bag.scroll[sk.grade];
+    const div = document.createElement("div");
+    div.className = "item " + CONFIG.gradeColor[sk.grade];
+    if(owned){
+      div.innerText = `【${sk.name}】已习得｜${sk.desc}`;
+    }else{
+      const ok = cnt >= need;
+      div.innerText = `【${sk.name}】${sk.desc}｜需${CONFIG.grade_name[sk.grade]}残页${need}（持有${cnt}）`;
+      if(ok) div.onclick = ()=>learnFreeSkill(sk);
+      else div.style.opacity = "0.5";
+    }
+    wrap.appendChild(div);
+  });
+}
+
+// ========== 师门师傅：逐式传授 → 出师 ==========
+const TEACH_LV   = {white:1,  blue:5,  purple:10, red:15, gold:20};
+const TEACH_GOLD = {white:30, blue:60, purple:120,red:200,gold:300};
+// 师傅逐式传授本门武学（red/gold 高阶招式须出师后自行参悟或秘境获取）
+function teachSkill(sk){
+  const m = CONFIG.master_def[player.school];
+  if(!m) return;
+  if(player.learnSkill.find(x=>x.name===sk.name)){ addLog(`【${sk.name}】你已习得。`); return; }
+  if(["red","gold"].includes(sk.grade)){ addLog(`【${sk.name}】乃本门绝学，须出师后凭机缘参悟，师傅暂不传授。`); return; }
+  if(player.lv < TEACH_LV[sk.grade]){ addLog(`火候未到：习得【${sk.name}】需 Lv${TEACH_LV[sk.grade]}。`); return; }
+  const cost = TEACH_GOLD[sk.grade];
+  if(player.gold < cost){ addLog(`孝敬师傅需银两 ${cost}，眼下不足。`); return; }
+  player.gold -= cost;
+  player.learnSkill.push(JSON.parse(JSON.stringify(sk)));
+  addLog(`👤 【${m.name}】沉吟片刻，将【${sk.name}】一招一式拆解演示：「${sk.desc}」，你默记于心。`);
+  saveGame(); refreshUI();
+}
+function teachSkillByName(name){
+  const sk = currentSchool && currentSchool.wugong.find(w=>w.name===name);
+  if(sk) teachSkill(sk);
+}
+function graduateMaster(m){
+  player.gold += m.rewardGold;
+  if(m.rewardNeigong && !player.learnNeigong.find(n=>n.name===m.rewardNeigong)){
+    const ng = currentSchool.neigong.find(n=>n.name===m.rewardNeigong);
+    if(ng) player.learnNeigong.push(ng);
+  }
+  if(m.rewardNeigong && CONFIG.neigong_def[m.rewardNeigong]){
+    player.nowNeigong = m.rewardNeigong;   // 自动主运奖励内功
+  }
+  // 出师专属金装：按门派套路取一件顶级兵刃
+  const gift = CONFIG.equip_pool.find(e=>e.grade==="gold" && e.slot==="weapon" && e.style===m.gradStyle);
+  if(gift && !player.bag.equip.find(x=>x.name===gift.name)){
+    player.bag.equip.push(JSON.parse(JSON.stringify(gift)));
+  }
+  player.masterGraduated = true;
+  player.title = m.gradTitle;
+  addLog(`🎓 【${m.name}】抚须道：「你已尽得本门真传，今日准你出师，授称号【${m.gradTitle}】。」`);
+  addLog(`📜 出师赠礼：赏银 ${m.rewardGold}，授【${m.rewardNeigong}】${gift ? `，赐兵刃【${gift.name}】` : ""}。`);
+  saveGame(); refreshUI();
+}
+function renderMasterBox(){
+  const box = document.getElementById("masterBox");
+  if(!box) return;
+  const m = CONFIG.master_def[player.school];
+  if(!m){ box.innerHTML = "<div>无师门</div>"; return; }
+  const skillCount = currentSchool ? currentSchool.wugong.filter(w=>player.learnSkill.find(x=>x.name===w.name)).length : 0;
+  const lvOk = player.lv >= m.graduateLv;
+  const skOk = skillCount >= m.graduateSkills;
+
+  // 本门武学逐式传授列表
+  const schoolWg = currentSchool ? currentSchool.wugong : [];
+  const listHtml = schoolWg.map(sk=>{
+    const owned = player.learnSkill.find(x=>x.name===sk.name);
+    const lvNeed = TEACH_LV[sk.grade], goldNeed = TEACH_GOLD[sk.grade];
+    const locked = ["red","gold"].includes(sk.grade);
+    if(owned) return `<div class="item ${CONFIG.gradeColor[sk.grade]}">【${sk.name}】已习得 ✅</div>`;
+    const canTeach = !locked && player.lv>=lvNeed && player.gold>=goldNeed;
+    const btnTxt = locked ? "出师后机缘参悟" : `请教传授（Lv${lvNeed}·银${goldNeed}）`;
+    return `<div class="item ${CONFIG.gradeColor[sk.grade]}">【${sk.name}】${sk.desc}
+      <button ${canTeach?"":"disabled"} onclick="teachSkillByName('${sk.name}')">${btnTxt}</button></div>`;
+  }).join("");
+
+  if(player.masterGraduated){
+    box.innerHTML = `<div class="item">【${m.name}】${m.title}｜已出师 ✅<br>称号：【${player.title||m.gradTitle}】<br><span style="color:#999">${m.quote}</span></div>${listHtml}`;
+    return;
+  }
+  box.innerHTML = "";
+  const div = document.createElement("div");
+  div.className = "item";
+  div.innerHTML = `【${m.name}】${m.title}<br><span style="color:#999">${m.quote}</span><br>出师条件：Lv${m.graduateLv}（当前 ${player.lv}）、习得本门 ${m.graduateSkills} 门武学（当前 ${skillCount}）`;
+  const btn = document.createElement("button");
+  btn.innerText = (lvOk && skOk) ? "拜师出师，领取赠礼" : "请教师傅（未达出师条件）";
+  btn.disabled = !(lvOk && skOk);
+  btn.onclick = ()=>graduateMaster(m);
+  div.appendChild(btn);
+  box.appendChild(div);
+  const list = document.createElement("div");
+  list.innerHTML = listHtml;
+  box.appendChild(list);
+}
+
 // ========== UI渲染 ==========
 function renderSkillBtn(){
   const box = document.getElementById("skillBtnBox");
   box.innerHTML = "";
+  const sealWeapon = hasState(player,"seal_weapon");
+  const qiReady = (player.qi||0) >= 100;
   player.learnSkill.forEach(sk=>{
     const btn = document.createElement("button");
-    btn.innerText = sk.name;
+    const noMp = player.mp < sk.mpCost;
+    const locked = sealWeapon && isWeaponSkill(sk);
+    let tag = "";
+    if(locked) tag = "（封）";
+    else if(noMp) tag = "（内不足）";
+    else if(!qiReady) tag = "（集气中）";
+    btn.innerText = sk.name + tag;
+    if(locked || noMp || !qiReady) btn.style.opacity = "0.45";
+    else btn.style.opacity = "1";
     btn.onclick = ()=>useSkill(sk);
     box.appendChild(btn);
   })
@@ -764,6 +1685,10 @@ function renderSkillBtn(){
 function refreshUI(){
   const stat = calcPlayerStat();
   document.getElementById("playerSchool").innerText = player.school;
+  const titleEl = document.getElementById("playerTitle");
+  if(titleEl) titleEl.innerText = player.title || "无名小卒";
+  const specEl = document.getElementById("playerSpec");
+  if(specEl) specEl.innerText = player.spec ? (CONFIG.spec_def[player.spec]||{}).name : "未择专精";
   document.getElementById("playerLv").innerText = player.lv;
   document.getElementById("gold").innerText = player.gold;
   document.getElementById("hp").innerText = Math.max(0,player.hp);
@@ -780,7 +1705,7 @@ function refreshUI(){
     document.getElementById("enemyName").innerText = enemy.name;
     document.getElementById("enemyHp").innerText = Math.max(0,enemy.hp);
     document.getElementById("enemyMaxHp").innerText = enemy.maxHp;
-    document.getElementById("enemyDebuff").innerText = enemy.debuff.map(d=>CONFIG.state_def[d.type]?.name).join("、");
+    document.getElementById("enemyDebuff").innerText = formatStates(enemy);
   }else{
     document.getElementById("enemyName").innerText = "-";
     document.getElementById("enemyHp").innerText = "-";
@@ -789,17 +1714,28 @@ function refreshUI(){
   }
   document.getElementById("partnerFightName").innerText = player.activePartner ? player.activePartner.name : "无";
   player.debuff = player.debuff || [];
-  document.getElementById("playerDebuff").innerText = player.debuff.map(d=>CONFIG.state_def[d.type]?.name).join("、");
+  player.buff = player.buff || [];
+  document.getElementById("playerDebuff").innerText = formatStates(player);
 
   const skillWrap = document.getElementById("skillList");
   skillWrap.innerHTML = player.learnSkill.map(s=>`<div class="item ${CONFIG.gradeColor[s.grade]}">${s.name}【套路:${s.style}】</div>`).join("");
+  renderFreeSkillList();
+  renderMasterBox();
 
   const wearWrap = document.getElementById("equipWear");
-  wearWrap.innerHTML = player.wearEquip ? `<div class="item">${player.wearEquip.name} 攻击+${player.wearEquip.atk} 防御+${player.wearEquip.def}</div>` : "<div>无</div>";
+  const w = player.wearWeapon, a = player.wearArmor;
+  const slotHtml = (label, eq, slot) => eq
+    ? `<div class="item">${label}：${eq.name}〔${CONFIG.style_name[eq.style]||"通用"}〕攻+${eq.atk} 防+${eq.def} <a href="javascript:unwearEquip('${slot}')" style="color:#f88">卸下</a></div>`
+    : `<div class="item">${label}：无</div>`;
+  wearWrap.innerHTML = slotHtml("兵刃/暗器", w, "weapon") + slotHtml("防具", a, "armor");
 
   const equipWrap = document.getElementById("equipList");
   equipWrap.innerHTML = player.bag.equip.length>0
-    ? player.bag.equip.map((e,i)=>`<div class="item ${CONFIG.gradeColor[e.grade]}" onclick="wearEquip(${i})">${e.name} 攻击+${e.atk} 防御+${e.def}｜点击穿戴</div>`).join("")
+    ? player.bag.equip.map((e,i)=>{
+        const type = e.slot==="armor"?"防具":"兵刃";
+        const st = CONFIG.style_name[e.style]||"通用";
+        return `<div class="item ${CONFIG.gradeColor[e.grade]}" onclick="wearEquip(${i})">${e.name}〔${type}·${st}〕攻+${e.atk} 防+${e.def}｜点击穿戴</div>`;
+      }).join("")
     : "<div>空</div>";
   const herbWrap = document.getElementById("herbList");
   herbWrap.innerHTML = player.bag.herb.length>0
@@ -809,6 +1745,7 @@ function refreshUI(){
   scrollWrap.innerHTML = Object.entries(player.bag.scroll).map(([g,cnt])=>`<div class="item ${CONFIG.gradeColor[g]}">${CONFIG.grade_name[g]}残页：${cnt}</div>`).join("");
 
   renderMapList();
+  refreshQiUI();
   if(inBattle) renderSkillBtn();
 }
 function addLog(txt){
@@ -818,7 +1755,7 @@ function addLog(txt){
 function restGame(){
   if(confirm("确定重新开局？存档会被清空！")){
     clearSave();
-    player = {}; currentSchool = null; enemy=null; inBattle=false; currentQuestNpc=null;
+    player = {}; currentSchool = null; enemy=null; inBattle=false; currentQuest=null;
     currentDungeon = null; battleBusy = false;
     fxReset();
     document.getElementById("menu").classList.remove("hide");
@@ -831,6 +1768,73 @@ function restGame(){
 // ========== 2D 战斗场景 ==========
 const BC = document.getElementById("battleCanvas");
 const bctx = BC ? BC.getContext("2d") : null;
+
+// ========== 战棋网格 ==========
+const GRID_COLS = 8, GRID_ROWS = 4;
+const PLAYER_MOVE = 2;    // 玩家每回合移动力
+const ENEMY_MOVE = 2;     // 敌人移动力
+// 地形障碍格：不可通行、不可站位
+const OBSTACLES = [{x:3,y:1},{x:4,y:2},{x:3,y:2}];
+function isObstacle(x,y){ return OBSTACLES.some(o=>o.x===x&&o.y===y); }
+function cellW(){ return BC.width / GRID_COLS; }
+function cellH(){ return BC.height / GRID_ROWS; }
+function cellCenter(pos){ return { x:(pos.x+0.5)*cellW(), y:(pos.y+0.5)*cellH() }; }
+function manhattan(a,b){ return Math.abs(a.x-b.x)+Math.abs(a.y-b.y); }
+function skillRange(skill){
+  switch(skill.range){
+    case "single": return 1;
+    case "line2": return 2;
+    case "smallcross": return 2;
+    case "fan": return 2;
+    case "bigcross": return 2;
+    case "longline": return 3;
+    case "halfscreen": return 3;
+    case "fullscreen": return 99;
+    case "self": case "team": return 0;
+    default: return 1;
+  }
+}
+function occupiedBy(x,y){
+  if(isObstacle(x,y)) return "obstacle";
+  if(enemy && enemy.pos && enemy.pos.x===x && enemy.pos.y===y) return "enemy";
+  if(player.activePartner && player.partnerPos && player.partnerPos.x===x && player.partnerPos.y===y) return "partner";
+  return null;
+}
+// 伙伴独立走位：自动向敌人逼近，避开障碍/玩家/敌人
+function partnerApproach(){
+  if(!player.activePartner || !player.partnerPos || !enemy || !enemy.pos) return;
+  const pp = player.partnerPos;
+  if(manhattan(pp, enemy.pos) <= 1) return;
+  const dx = Math.sign(enemy.pos.x - pp.x);
+  const dy = Math.sign(enemy.pos.y - pp.y);
+  const tryMove = (nx, ny) => {
+    if(nx<0||nx>=GRID_COLS||ny<0||ny>=GRID_ROWS) return false;
+    if(isObstacle(nx,ny)) return false;
+    if(player.pos && player.pos.x===nx && player.pos.y===ny) return false;
+    if(enemy.pos && enemy.pos.x===nx && enemy.pos.y===ny) return false;
+    player.partnerPos = {x:nx,y:ny}; return true;
+  };
+  if(dx!==0 && !tryMove(pp.x+dx, pp.y)){ if(dy!==0) tryMove(pp.x, pp.y+dy); }
+  else if(dy!==0) tryMove(pp.x, pp.y+dy);
+}
+// 夹击：伙伴与敌人相邻，形成阵型围殴
+function partnerPinching(){
+  return !!(player.activePartner && player.partnerPos && enemy && enemy.pos &&
+            manhattan(player.partnerPos, enemy.pos) === 1);
+}
+// 玩家可移动格集合
+function playerMovableCells(){
+  const res = [];
+  if(!player.pos) return res;
+  for(let x=0;x<GRID_COLS;x++){
+    for(let y=0;y<GRID_ROWS;y++){
+      if(manhattan(player.pos,{x,y}) <= PLAYER_MOVE && !occupiedBy(x,y)){
+        res.push({x,y});
+      }
+    }
+  }
+  return res;
+}
 
 const PLAYER_ART = "assets/player/idle.png";
 const BG_ART = {
@@ -1022,25 +2026,62 @@ function drawBattle(){
     return;
   }
 
-  const px = w*0.26, py = h*0.88;
+  // 战棋网格
+  bctx.strokeStyle = "rgba(255,255,255,0.07)";
+  bctx.lineWidth = 1;
+  for(let gx=1; gx<GRID_COLS; gx++){
+    bctx.beginPath(); bctx.moveTo(gx*cellW(),0); bctx.lineTo(gx*cellW(),h); bctx.stroke();
+  }
+  for(let gy=1; gy<GRID_ROWS; gy++){
+    bctx.beginPath(); bctx.moveTo(0, gy*cellH()); bctx.lineTo(w, gy*cellH()); bctx.stroke();
+  }
+
+  // 地形障碍格（山石/枯木，不可通行）
+  OBSTACLES.forEach(o=>{
+    bctx.fillStyle = "rgba(120,120,130,0.35)";
+    bctx.fillRect(o.x*cellW()+3, o.y*cellH()+3, cellW()-6, cellH()-6);
+    bctx.fillStyle = "rgba(180,180,190,0.5)";
+    bctx.font = `${Math.floor(cellW()*0.4)}px sans-serif`;
+    bctx.textAlign = "center";
+    bctx.fillText("石", (o.x+0.5)*cellW(), (o.y+0.65)*cellH());
+  });
+
+  // 可移动格高亮
+  if(inBattle && !battleBusy && player.pos){
+    playerMovableCells().forEach(c=>{
+      bctx.fillStyle = "rgba(79,208,107,0.18)";
+      bctx.fillRect(c.x*cellW()+2, c.y*cellH()+2, cellW()-4, cellH()-4);
+    });
+  }
+
+  // 玩家单位
+  const pc = cellCenter(player.pos || {x:1,y:2});
+  const px = pc.x, py = pc.y;
   const bob = Math.sin(t*2) * 2;
   const pImg = getImg("player", PLAYER_ART);
-  if(!isReady(pImg) || !drawSprite(pImg, px, py+bob, 92, 128)){
-    drawPlaceholder(px, py, 44, 76, "#3a6ea5", player.school || "我");
+  if(!isReady(pImg) || !drawSprite(pImg, px, py+bob+16, 40, 52)){
+    drawPlaceholder(px, py+16, 30, 44, "#3a6ea5", player.school || "我");
   }
-  drawHpBar(px, py-140, 84, player.hp, player.maxHp, "#4fd06b");
+  drawHpBar(px, py-26, 56, player.hp, player.maxHp, "#4fd06b");
 
-  if(enemy){
-    const ex = w*0.74, ey = h*0.88;
+  // 伙伴单位
+  if(player.activePartner && player.partnerPos){
+    const pp = cellCenter(player.partnerPos);
+    drawPlaceholder(pp.x, pp.y+16, 26, 38, "#3b8a6e", "友");
+  }
+
+  if(enemy && enemy.pos){
+    const ec = cellCenter(enemy.pos);
+    const ex = ec.x, ey = ec.y;
     const eImg = getImg("enemy:"+enemy.name, ENEMY_ART[enemy.name]);
     const dead = enemy.hp <= 0;
     bctx.save();
     bctx.globalAlpha = dead ? Math.max(0, battleFX.enemyDown/45) : 1;
-    if(!isReady(eImg) || !drawSprite(eImg, ex, ey+Math.sin(t*2+1)*2, 110, 140)){
-      drawPlaceholder(ex, ey, 52, 84, "#8a3b3b", enemy.name);
+    if(!isReady(eImg) || !drawSprite(eImg, ex, ey+Math.sin(t*2+1)*2+16, 44, 54)){
+      drawPlaceholder(ex, ey+16, 32, 46, "#8a3b3b", enemy.name);
     }
     bctx.restore();
-    drawHpBar(ex, ey-150, 100, enemy.hp, enemy.maxHp, "#e05555");
+    drawHpBar(ex, ey-26, 60, enemy.hp, enemy.maxHp, "#e05555");
   }
 
   drawSlashEffect();
@@ -1087,3 +2128,23 @@ document.addEventListener("pointerdown", tryPlayBgm);
 // ========== 启动 ==========
 window.onload = ()=>renderSchoolMenu();
 if(bctx) requestAnimationFrame(battleLoop);
+// 半即时集气常驻 tick（非战斗时空转）
+battleTimer = setInterval(battleQiTick, TICK_MS);
+
+// 战棋：点击格子移动
+if(BC){
+  BC.addEventListener("click", e=>{
+    if(!inBattle || battleBusy || !player.pos) return;
+    const rect = BC.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * BC.width / rect.width;
+    const my = (e.clientY - rect.top) * BC.height / rect.height;
+    const gx = Math.floor(mx / cellW()), gy = Math.floor(my / cellH());
+    if(gx<0 || gx>=GRID_COLS || gy<0 || gy>=GRID_ROWS) return;
+    const movable = playerMovableCells().some(c=>c.x===gx && c.y===gy);
+    if(movable){
+      player.pos = {x:gx, y:gy};
+      addLog(`你移步到 ${gx+1}-${gy+1} 格`);
+      refreshUI();
+    }
+  });
+}
