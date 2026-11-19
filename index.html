@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>江湖残页录｜网页武侠</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <h1>江湖残页录</h1>
+  <div id="menu">
+    <h3>选择门派</h3>
+    <div id="schoolList"></div>
+    <div style="margin-top:12px;">
+      <button onclick="loadSave()">读取存档</button>
+      <button onclick="clearSave()">删除存档</button>
+    </div>
+  </div>
+
+  <div id="gamePanel" class="hide">
+    <div class="row">
+      <div class="box">
+        <h4>📌 玩家信息</h4>
+        <div>门派：<span id="playerSchool"></span></div>
+        <div>等级：Lv.<span id="playerLv"></span></div>
+        <div>银两：<span id="gold"></span></div>
+        <div>气血：<span id="hp"></span>/<span id="maxHp"></span></div>
+        <div>内力：<span id="mp"></span>/<span id="maxMp"></span></div>
+        <div>攻击：<span id="atk"></span>｜防御：<span id="def"></span></div>
+        <div>集气速度：<span id="qiSpeed"></span></div>
+        <div>【主运内功】<span id="nowNeigong"></span></div>
+        <div>【轻功】<span id="nowQinggong"></span></div>
+        <div class="tabs">
+          <button onclick="switchTab('skill')">武学</button>
+          <button onclick="switchTab('bag')">背包</button>
+          <button onclick="switchTab('map')">秘境</button>
+          <button onclick="switchTab('shop')">商店</button>
+          <button onclick="switchTab('partner')">伙伴</button>
+        </div>
+        <div id="tabSkill" class="tab-content">
+          <h5>已学武学</h5>
+          <div id="skillList"></div>
+        </div>
+        <div id="tabBag" class="tab-content hide">
+          <h5>背包｜点击使用/穿戴</h5>
+          <div>【已穿戴装备】</div>
+          <div id="equipWear"></div>
+          <div>【装备背包】</div>
+          <div id="equipList"></div>
+          <div>【药材】</div>
+          <div id="herbList"></div>
+          <div>【残页】</div>
+          <div id="scrollList"></div>
+        </div>
+        <div id="tabMap" class="tab-content hide">
+          <h5>秘境地图（点击光点进入，有概率触发奇遇）</h5>
+          <canvas id="mapCanvas" width="480" height="320"></canvas>
+          <div id="mapList"></div>
+          <div id="questBox" class="hide">
+            <h5>✨ 奇遇！</h5>
+            <div id="questText"></div>
+            <div id="questBtnBox"></div>
+          </div>
+        </div>
+        <div id="tabShop" class="tab-content hide">
+          <h5>江湖商店</h5>
+          <div id="shopList"></div>
+        </div>
+        <div id="tabPartner" class="tab-content hide">
+          <h5>伙伴列表（上阵伙伴战斗自动协助）</h5>
+          <div id="partnerList"></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h4>⚔️ 战斗区域</h4>
+        <canvas id="battleCanvas" width="480" height="240"></canvas>
+        <div>敌人：<span id="enemyName"></span></div>
+        <div>气血：<span id="enemyHp"></span>/<span id="enemyMaxHp"></span></div>
+        <div>敌人状态：<span id="enemyDebuff"></span></div>
+        <div>玩家状态：<span id="playerDebuff"></span></div>
+        <div>上阵伙伴：<span id="partnerFightName"></span></div>
+        <div class="btn-row" id="skillBtnBox"></div>
+        <div class="log" id="battleLog"></div>
+        <button onclick="exitBattle()">退出战斗</button>
+        <button onclick="restGame()">重新开局</button>
+      </div>
+    </div>
+  </div>
+</div>
+<audio id="audioAttack" src="attack.mp3" preload="auto"></audio>
+<audio id="audioHit" src="hit.mp3" preload="auto"></audio>
+<audio id="audioWin" src="win.mp3" preload="auto"></audio>
+<audio id="audioBgm" src="bgm.mp3" loop preload="auto"></audio>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+*{box-sizing:border-box;font-family:"Microsoft Yahei",sans-serif;}
+body{
+  background:#222;color:#eee;padding:8px;margin:0;
+  background-image:url("bg.jpg");
+  background-size:cover;
+  background-attachment:fixed;
+  background-color:rgba(20,20,20,0.88);
+  background-blend-mode:multiply;
+}
+.container{max-width:1100px;margin:0 auto;}
+.box{background:rgba(40,40,40,0.88);padding:12px;border-radius:8px;margin:6px 0;}
+.row{display:flex;gap:10px;flex-wrap:wrap;}
+.row > .box{flex:1;min-width:300px;}
+.hide{display:none;}
+button{
+  padding:10px 8px;margin:4px;border:none;border-radius:6px;
+  background:#4488dd;color:#fff;cursor:pointer;font-size:14px;
+}
+button:hover{background:#5599ee;}
+button:active{background:#3377cc;}
+.log{
+  margin-top:10px;background:rgba(0,0,0,0.75);
+  padding:10px;height:200px;overflow-y:auto;
+  border:1px solid #444;font-size:13px;line-height:1.5;
+}
+.school-item{padding:10px;margin:6px;background:#3a3a3a;border-radius:6px;cursor:pointer;}
+.school-item:hover{background:#446;}
+.tabs{margin:8px 0;display:flex;gap:4px;flex-wrap:wrap;}
+.tab-content{padding:8px;border:1px solid #444;border-radius:6px;margin-top:8px;min-height:160px;}
+.item{padding:6px;margin:4px;background:#444;border-radius:5px;font-size:14px;cursor:pointer;}
+.item:hover{background:#555;}
+.grade-white{color:#ddd;}
+.grade-blue{color:#6cf;}
+.grade-purple{color:#c6f;}
+.grade-red{color:#f66;}
+.grade-gold{color:#fd0;}
+#questBox{margin-top:12px;border:1px solid #fa4;padding:10px;border-radius:6px;background:rgba(60,50,20,0.7);}
+
+/* 2D 战斗场景 */
+#battleCanvas{
+  width:100%;height:auto;display:block;margin:8px 0;
+  background:#111;border-radius:6px;
+  image-rendering:pixelated;
+  border:1px solid #333;
+}
+#mapCanvas{
+  width:100%;height:auto;display:block;
+  background:#111;border:1px solid #333;border-radius:8px;
+  cursor:pointer;margin-bottom:8px;
+}
+
+/* 手机小屏适配 */
+@media (max-width: 640px){
+  .row{flex-direction:column;}
+  .box{min-width:unset;}
+  button{font-size:15px;padding:11px 6px;}
+  .log{height:160px;}
+  h1{font-size:20px;text-align:center;}
+}
