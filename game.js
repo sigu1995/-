@@ -353,7 +353,18 @@ const CONFIG = {
       {name:"江湖悍匪", lv:60, hp:720,  atk:54, def:20, dropGrade:["purple","red"]},
       {name:"西域高手", lv:75, hp:860,  atk:64, def:24, dropGrade:["red"]},
       {name:"武林魔头", lv:90, hp:1000, atk:74, def:28, dropGrade:["red","gold"]}
-    ]
+    ],
+
+    // ===== 野外精英敌人配置 =====
+    elite_cfg: {
+      spawnChance: 0.12,      // 普通怪转精英概率 12%
+      hpMult: 1.6,            // 血量倍率
+      atkMult: 1.45,          // 攻击倍率
+      defMult: 1.3,           // 防御倍率
+      goldBonus: 1.8,         // 银两奖励倍率
+      equipBonusChance: 0.45, // 精英额外装备掉落概率
+      affixPool: ["bleed","poison","slow_qi","break_def","cold_poison"] // 精英随机携带状态词缀
+    }
   };
 
 const SAVE_KEY = "jianghu_save";
@@ -378,6 +389,13 @@ const audioHit = document.getElementById("audioHit");
 const audioWin = document.getElementById("audioWin");
 const audioBgm = document.getElementById("audioBgm");
 let bgmStarted = false;
+
+// 安全播放音效：音频文件缺失时静默失败，不中断战斗流程
+function safePlay(audio){
+  if(!audio) return;
+  const p = audio.play();
+  if(p && p.catch) p.catch(()=>{});
+}
 
 // ========== 属性计算 ==========
 function wornEquips(){
@@ -408,13 +426,14 @@ function calcPlayerStat(){
   return {atk, def, qiSpeed, mod};
 }
 
-// 敌人属性（受自身debuff/buff修正）
+// 敌人属性（受自身debuff/buff修正）——【修复】补充集气速度 qiSpeed，使敌人集气与滞气debuff双向生效
 function calcEnemyStat(){
-  if(!enemy) return {atk:1, def:0, mod:getStateMod(null)};
+  if(!enemy) return {atk:1, def:0, qiSpeed:1, mod:getStateMod(null)};
   const mod = getStateMod(enemy);
   const atk = Math.max(1, Math.round(enemy.atk * mod.atkMul));
   const def = Math.max(0, Math.round((enemy.def||0) * mod.defMul));
-  return {atk, def, mod};
+  const qiSpeed = 1.0 * mod.qiMul;
+  return {atk, def, qiSpeed, mod};
 }
 
 // ========== 存档 ==========
@@ -431,6 +450,11 @@ function loadSave(){
   player.comboCharge = player.comboCharge || 0;
   player.qi = player.qi || 0;
   player.masterGraduated = !!player.masterGraduated;
+  // 【修复】旧存档补齐血内上限并钳制当前值，避免 undefined / 溢出
+  player.maxHp = player.maxHp || 300;
+  player.maxMp = player.maxMp || 120;
+  player.hp = Math.min(player.hp ?? player.maxHp, player.maxHp);
+  player.mp = Math.min(player.mp ?? player.maxMp, player.maxMp);
   // 旧存档单槽装备迁移到双槽
   if(player.wearEquip){
     if(player.wearEquip.slot === "armor") player.wearArmor = player.wearEquip;
@@ -812,20 +836,25 @@ function renderMapCanvas(){
     c.fillText(`Lv${d.level_min}-${d.level_max}`, x, y + 22);
   });
 
-  // 野外明雷怪
+  // 野外明雷怪（精英为红色高亮，普通为橙色）
   wildSpawns.forEach(s=>{
     if(!s.alive) return;
     const x = s.x*w, y = s.y*h;
     c.beginPath();
+    if(s.mob && s.mob.isElite){
+      c.fillStyle = "#ff4444";
+      c.strokeStyle = "#ffbbbb";
+    }else{
+      c.fillStyle = "#e08a3b";
+      c.strokeStyle = "#f88";
+    }
     c.arc(x, y, 7, 0, Math.PI*2);
-    c.fillStyle = "#e08a3b";
     c.fill();
-    c.strokeStyle = "#f88";
     c.lineWidth = 1.5;
     c.stroke();
     c.textAlign = "center";
     c.font = "10px sans-serif";
-    c.fillStyle = "#fca";
+    c.fillStyle = (s.mob && s.mob.isElite) ? "#ffaaaa" : "#fca";
     c.fillText(s.name, x, y - 12);
   });
 }
@@ -906,15 +935,20 @@ function renderMapList(){
 
 // ========== 战斗启动 ==========
 function makeEnemy(cfg){
+  const mp = Math.floor(cfg.hp * 0.4);
   return {
     name:cfg.name, hp:cfg.hp, maxHp:cfg.hp,
+    mp: mp, maxMp: mp,
     atk: cfg.atk || Math.floor(cfg.hp/12),
     def: cfg.def || Math.floor(cfg.hp/28),
     lv: cfg.lv || player.lv,
     qi:0, debuff:[], buff:[],
     skill:cfg.skill || "普攻", state:cfg.state || "",
     dropGrade:cfg.dropGrade || ["white"],
-    isBoss:!!cfg.isBoss, aiMode:"normal"
+    isBoss:!!cfg.isBoss,
+    isElite:!!cfg.isElite,
+    eliteAffix: cfg.eliteAffix || "",
+    aiMode:"normal"
   };
 }
 function startBattle(cfg, sceneName){
@@ -928,7 +962,13 @@ function startBattle(cfg, sceneName){
   player.qi = 20;   // 开场玩家略占先手机会
   enemy.qi = 0;
   currentScene = sceneName || "江湖";
-  addLog(`=== 【${currentScene}】遭遇${enemy.isBoss ? "BOSS " : ""}【${enemy.name}】===`);
+  addLog(`=== 【${currentScene}】遭遇${enemy.isBoss ? "BOSS " : ""}${enemy.isElite ? "⚠精英 " : ""}【${enemy.name}】===`);
+  // 精英进场，开局自带词缀状态
+  if(enemy.isElite && enemy.eliteAffix){
+    applyState(enemy, enemy.eliteAffix);
+    const affixName = (CONFIG.state_def[enemy.eliteAffix] || {}).name || "";
+    addLog(`💥 精英敌人自带词缀【${affixName}】！`);
+  }
   refreshUI();
   renderSkillBtn();
 }
@@ -937,15 +977,26 @@ function pickBossForLv(lv){
   const pool = CONFIG.boss_list.filter(b=>b.lv <= lv + 5);
   return pool.length ? pool[pool.length-1] : null;
 }
-// 按等级挑野外怪模板并随等级成长
+// 按等级挑野外怪模板并随等级成长；有概率roll成精英
 function pickWildMob(lv){
   const pool = CONFIG.wild_mobs.filter(m=>m.lv <= lv + 5);
   const m = pool.length ? pool[pool.length-1] : CONFIG.wild_mobs[0];
   const scale = 1 + Math.max(0, lv - m.lv) * 0.05;
-  return {
+  const mob = {
     name:m.name, hp:Math.round(m.hp*scale), atk:Math.round(m.atk*scale),
-    def:m.def, lv:lv, dropGrade:m.dropGrade
+    def:m.def, lv:lv, dropGrade:m.dropGrade,
+    isElite:false, eliteAffix:""
   };
+  const ec = CONFIG.elite_cfg;
+  if(Math.random() < ec.spawnChance){
+    mob.isElite = true;
+    mob.name = "【精英】" + mob.name;
+    mob.hp = Math.round(mob.hp * ec.hpMult);
+    mob.atk = Math.round(mob.atk * ec.atkMult);
+    mob.def = Math.round(mob.def * ec.defMult);
+    mob.eliteAffix = ec.affixPool[Math.floor(Math.random()*ec.affixPool.length)];
+  }
+  return mob;
 }
 function startWildBattle(){ startBattle(pickWildMob(player.lv), "野外"); }
 
@@ -953,11 +1004,19 @@ function startWildBattle(){ startBattle(pickWildMob(player.lv), "野外"); }
 function startDungeon(dun){
   if(triggerQuest()) return;
   currentDungeon = dun;
-  let cfg = {name:dun.enemy, hp:dun.hp, dropGrade:dun.dropGrade};
+  let cfg = {name:dun.enemy, hp:dun.hp, dropGrade:dun.dropGrade, isElite:false, eliteAffix:""};
   const boss = pickBossForLv(player.lv);
   if(boss && Math.random() < 0.2){
     cfg = Object.assign({}, boss, {isBoss:true});
     addLog("⚠ 一股强大的气息逼近……");
+  }else{
+    // 秘境普通敌人小概率刷成精英（概率为野外的 60%）
+    if(Math.random() < CONFIG.elite_cfg.spawnChance * 0.6){
+      cfg.isElite = true;
+      cfg.name = "【精英】" + cfg.name;
+      cfg.hp = Math.round(cfg.hp * CONFIG.elite_cfg.hpMult);
+      cfg.eliteAffix = CONFIG.elite_cfg.affixPool[Math.floor(Math.random()*CONFIG.elite_cfg.affixPool.length)];
+    }
   }
   startBattle(cfg, dun.name);
 }
@@ -1161,12 +1220,12 @@ function applyState(target, stateStr, opts){
   });
 }
 
-// ========== 伙伴出手 ==========
+// ========== 伙伴出手（修复：按敌人修正后防御计算减伤） ==========
 function partnerAttack(){
   if(!player.activePartner || !enemy) return;
   const p = player.activePartner;
-  const eDef = enemy.def || 0;
-  const dmg = Math.max(1, p.atk + Math.floor(Math.random()*10) - Math.floor(eDef*0.2));
+  const eStat = calcEnemyStat();
+  const dmg = Math.max(1, p.atk + Math.floor(Math.random()*10) - Math.floor(eStat.def*0.2));
   enemy.hp -= dmg;
   clampTarget(enemy);
   addLog(`🤝伙伴【${p.name}】施展【${p.skill}】，造成 ${dmg} 伤害！`);
@@ -1174,9 +1233,9 @@ function partnerAttack(){
 }
 
 // ========== 战斗 ==========
-// 判断是否兵刃类武学（受封兵刃影响）
+// 判断是否兵刃类武学（受封兵刃影响）——【修复】扩充棒/杖/杵/扇等武器判定
 function isWeaponSkill(skill){
-  return /剑|刀|棍|枪|针|镖|箭|戟/.test(skill.name);
+  return /剑|刀|棍|枪|针|镖|箭|戟|棒|杖|杵|扇/.test(skill.name);
 }
 
 function calcPlayerDamage(skill, stat){
@@ -1255,7 +1314,7 @@ function useSkill(skill){
 
   if(selfCast){
     // 自身/团队增益类武学：不攻击敌人，状态挂在自己身上
-    audioAttack.play();
+    safePlay(audioAttack);
     fxCast(skill.style);
     addLog(`你运功施展【${skill.name}】，护住周身`);
     if(skill.state) applyState(player, skill.state, {source:player});
@@ -1271,7 +1330,7 @@ function useSkill(skill){
       addLog(`【舍身】自损 ${selfCost} 气血，招式威力大涨`);
     }
 
-    audioAttack.play();
+    safePlay(audioAttack);
     fxCast(skill.style);
 
     // 敌人闪避判定
@@ -1449,9 +1508,21 @@ function enemyTurn(){
   const eStat = calcEnemyStat();
   const rand = Math.random();
 
+  // 精英 AI：优先主动释放自带词缀
+  if(enemy.isElite && enemy.eliteAffix && Math.random() < 0.4){
+    if(enemy.eliteAffix === "cold_poison" && pStat.mod.antiCold){
+      addLog("你阳躯深厚，寒毒被内力震散！");
+    }else{
+      applyState(player, enemy.eliteAffix);
+      addLog(`${enemy.name}运功施展【${(CONFIG.state_def[enemy.eliteAffix]||{}).name||""}】！`);
+    }
+    clampTarget(player);
+    return;
+  }
+
   // AI 1：运功施加负面状态（30%）
   if(rand < 0.30){
-    const debList = ["bleed","poison","internal_injury","slow_qi"];
+    const debList = ["bleed","poison","internal_injury","slow_qi","cold_poison"];
     const pick = debList[Math.floor(Math.random()*debList.length)];
     if(pick === "cold_poison" && pStat.mod.antiCold){
       addLog("你阳躯深厚，寒毒被内力震散！");
@@ -1486,7 +1557,7 @@ function enemyTurn(){
     edmg = Math.max(1, edmg - Math.floor(pStat.def * 0.3));
     player.hp -= edmg;
     fxDamage("player", edmg);
-    audioHit.play();
+    safePlay(audioHit);
     addLog(`${enemy.name}攻击你，造成${edmg}伤害！`);
   }
   clampTarget(player);
@@ -1502,21 +1573,36 @@ function dropEquip(grade){
 function winBattle(){
   battleBusy = false;
   fxEnemyDie();
-  audioWin.play();
+  safePlay(audioWin);
   const isBoss = !!enemy.isBoss;
-  addLog(`✅ 击败【${enemy.name}】！${isBoss?"（BOSS 挑战）":""}`);
+  const isElite = !!enemy.isElite;
+  addLog(`✅ 击败【${enemy.name}】！${isBoss?"（BOSS 挑战）":""}${isElite?"（精英）":""}`);
   const grades = enemy.dropGrade || ["white"];
   const grade = grades[Math.floor(Math.random()*grades.length)];
   let scrollCount = 1;
   let gold = 30 + player.lv * 5;
   if(isBoss){ scrollCount = 2; gold += 100; }
+  // 精英奖励加成：银两倍率、残页 +1
+  if(isElite){
+    const ec = CONFIG.elite_cfg;
+    gold = Math.round(gold * ec.goldBonus);
+    scrollCount += 1;
+  }
   player.bag.scroll[grade] += scrollCount;
   player.gold += gold;
   addLog(`获得【${CONFIG.grade_name[grade]}残页】x${scrollCount}，银两+${gold}`);
-  // 装备掉落：普通怪 30% 掉同品级，BOSS 必掉紫品以上
-  const equipChance = isBoss ? 1 : 0.3;
+  // 装备掉落：普通怪 30%，精英额外掉率，BOSS 必掉紫品以上
+  let equipChance = isBoss ? 1 : 0.3;
+  if(isElite) equipChance += CONFIG.elite_cfg.equipBonusChance;
   if(Math.random() < equipChance){
-    const eg = isBoss ? ["purple","red","gold"][Math.floor(Math.random()*3)] : grade;
+    let eg;
+    if(isBoss){
+      eg = ["purple","red","gold"][Math.floor(Math.random()*3)];
+    }else if(isElite){
+      eg = Math.random() < 0.45 ? "purple" : grade;
+    }else{
+      eg = grade;
+    }
     const eq = dropEquip(eg);
     if(eq){ player.bag.equip.push(eq); addLog(`🗡 掉落装备【${eq.name}】（${CONFIG.grade_name[eq.grade]}）！`); }
   }
@@ -1705,11 +1791,15 @@ function refreshUI(){
     document.getElementById("enemyName").innerText = enemy.name;
     document.getElementById("enemyHp").innerText = Math.max(0,enemy.hp);
     document.getElementById("enemyMaxHp").innerText = enemy.maxHp;
+    document.getElementById("enemyMp").innerText = Math.max(0,enemy.mp ?? 0);
+    document.getElementById("enemyMaxMp").innerText = enemy.maxMp ?? 0;
     document.getElementById("enemyDebuff").innerText = formatStates(enemy);
   }else{
     document.getElementById("enemyName").innerText = "-";
     document.getElementById("enemyHp").innerText = "-";
     document.getElementById("enemyMaxHp").innerText = "-";
+    document.getElementById("enemyMp").innerText = "-";
+    document.getElementById("enemyMaxMp").innerText = "-";
     document.getElementById("enemyDebuff").innerText = "";
   }
   document.getElementById("partnerFightName").innerText = player.activePartner ? player.activePartner.name : "无";
@@ -1836,45 +1926,137 @@ function playerMovableCells(){
   return res;
 }
 
-const PLAYER_ART = "assets/player/idle.png";
-const BG_ART = {
-  "山间匪寨":"assets/bg/shanfei.png",
-  "毒蛇谷秘境":"assets/bg/dushe.png",
-  "废弃武馆":"assets/bg/jiaotou.png",
-  "丐帮分舵之乱":"assets/bg/panbang.png",
-  "华山思过崖":"assets/bg/jianzong.png",
-  "少林罗汉阵":"assets/bg/luohan.png",
-  "武当纯阳台":"assets/bg/wudang.png",
-  "桃花岛幻境":"assets/bg/taohua.png",
-  "西域绝情谷":"assets/bg/ligui.png",
-  "四绝试炼殿":"assets/bg/silian.png"
-};
-const ENEMY_ART = {
-  "山匪":"assets/enemy/shanfei.png",
-  "毒蛇妖":"assets/enemy/dushe.png",
-  "武馆教头":"assets/enemy/jiaotou.png",
-  "叛帮弟子":"assets/enemy/panbang.png",
-  "剑宗弟子":"assets/enemy/jianzong.png",
-  "罗汉守僧":"assets/enemy/luohan.png",
-  "武当守道":"assets/enemy/wudang.png",
-  "桃花岛影卫":"assets/enemy/taohua.png",
-  "谷中厉鬼":"assets/enemy/ligui.png",
-  "试炼虚影":"assets/enemy/silian.png"
+// ========== 内置程序化像素渲染系统（不依赖外部图片资源） ==========
+const PIXEL_PAL = {
+  skin:"#ffd7b5", skinDark:"#e8b48a", hair:"#1d1d1d",
+  white:"#ddd", gray:"#6b6b6b", gold:"#ffc107",
+  blue:"#2b60de", red:"#c82423", green:"#2e7d32", yellow:"#ffb300",
+  purple:"#9c27b0", darkred:"#b71c1c", elite:"#ff5722"
 };
 
-const IMG_CACHE = {};
-
-function getImg(key, src){
-  if(!src) return null;
-  if(IMG_CACHE[key]) return IMG_CACHE[key];
-  const im = new Image();
-  im.onerror = ()=>{ im._failed = true; };
-  im.src = src;
-  IMG_CACHE[key] = im;
-  return im;
+// 门派 → 像素角色衣色
+function schoolTheme(school){
+  switch(school){
+    case "武当派": return "wudang";
+    case "华山派": return "huashan";
+    case "丐帮": return "gai";
+    case "星宿派": return "xingxiu";
+    case "逍遥派": return "xiaoyao";
+    case "古墓派": return "gumu";
+    case "少林派": return "shaolin";
+    case "全真教": return "quanzhen";
+    case "桃花岛": return "taohua";
+    default: return "common";
+  }
 }
-function isReady(im){
-  return im && im.complete && im.naturalWidth > 0 && !im._failed;
+function themeCloth(theme){
+  switch(theme){
+    case "wudang": return PIXEL_PAL.blue;
+    case "huashan": return PIXEL_PAL.red;
+    case "gai": return PIXEL_PAL.yellow;
+    case "shaolin": return PIXEL_PAL.gray;
+    case "xiaoyao": return PIXEL_PAL.gold;
+    case "gumu": return PIXEL_PAL.purple;
+    case "xingxiu": return PIXEL_PAL.green;
+    case "quanzhen": return "#4caf50";
+    case "taohua": return "#e91e63";
+    case "boss": return PIXEL_PAL.darkred;
+    case "elite": return PIXEL_PAL.elite;
+    default: return "#3a6ea5";
+  }
+}
+
+// 场景像素背景贴图（渐变 + 远山 + 地面纹理），全部由代码绘制
+function drawPixelSceneBg(ctx, w, h, sceneName){
+  let topCol, botCol, ridge;
+  switch(sceneName){
+    case "山间匪寨": topCol="#3a454f"; botCol="#1e262c"; ridge="#2c3840"; break;
+    case "毒蛇谷秘境": topCol="#1a3825"; botCol="#0e2017"; ridge="#16301f"; break;
+    case "废弃武馆": topCol="#463b32"; botCol="#2a241e"; ridge="#3a3128"; break;
+    case "丐帮分舵之乱": topCol="#483a26"; botCol="#2a2218"; ridge="#3a2f1f"; break;
+    case "华山思过崖": topCol="#2b3b52"; botCol="#1a2536"; ridge="#233145"; break;
+    case "少林罗汉阵": topCol="#3a444a"; botCol="#22292e"; ridge="#2e383e"; break;
+    case "武当纯阳台": topCol="#2b4059"; botCol="#1a293a"; ridge="#243648"; break;
+    case "桃花岛幻境": topCol="#4a3448"; botCol="#2a1e2a"; ridge="#3a2838"; break;
+    case "西域绝情谷": topCol="#4a3c30"; botCol="#2c241c"; ridge="#3a2f26"; break;
+    case "四绝试炼殿": topCol="#313142"; botCol="#1c1c2a"; ridge="#282838"; break;
+    default: topCol="#22222e"; botCol="#0d0d14"; ridge="#191922";
+  }
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, topCol);
+  g.addColorStop(1, botCol);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  // 远景像素山峦
+  ctx.fillStyle = ridge;
+  for(let i=0;i<6;i++){
+    const mx = (i/6)*w + 20;
+    const mw = w/5;
+    ctx.beginPath();
+    ctx.moveTo(mx, h*0.42);
+    ctx.lineTo(mx+mw/2, h*0.18 + (i%2)*14);
+    ctx.lineTo(mx+mw, h*0.42);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // 地面
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(0, h*0.78, w, h*0.22);
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for(let i=0;i<5;i++){
+    ctx.beginPath();
+    ctx.moveTo(0, h*0.30 + i*12);
+    for(let x=0;x<=w;x+=24){
+      ctx.lineTo(x, h*0.30 + i*12 + Math.sin(x*0.018+i)*6);
+    }
+    ctx.stroke();
+  }
+}
+
+/**
+ * 程序化绘制 Q 版像素角色（金庸武侠风）
+ * @param ctx 2d 上下文
+ * @param cx 中心 x，by 底部 y，pw 宽，ph 高
+ * @param theme 门派/敌我主题
+ * @param t 时间（呼吸抖动）
+ */
+function drawPixelWuxiaSprite(ctx, cx, by, pw, ph, theme, t){
+  const bob = Math.sin(t*2.2)*2;
+  const baseY = by - ph + bob;
+  const cloth = themeCloth(theme);
+  const px = v => Math.round(v);
+  ctx.save();
+  // 腿
+  ctx.fillStyle = PIXEL_PAL.hair;
+  ctx.fillRect(px(cx-pw*0.16), px(baseY+ph*0.82), px(pw*0.12), px(ph*0.18));
+  ctx.fillRect(px(cx+pw*0.04), px(baseY+ph*0.82), px(pw*0.12), px(ph*0.18));
+  // 身体（衣袍）
+  ctx.fillStyle = cloth;
+  ctx.fillRect(px(cx-pw*0.26), px(baseY+ph*0.30), px(pw*0.52), px(ph*0.54));
+  // 腰带
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(px(cx-pw*0.26), px(baseY+ph*0.60), px(pw*0.52), px(ph*0.08));
+  // 手臂
+  ctx.fillStyle = cloth;
+  ctx.fillRect(px(cx-pw*0.38), px(baseY+ph*0.36), px(pw*0.12), px(ph*0.30));
+  ctx.fillRect(px(cx+pw*0.26), px(baseY+ph*0.36), px(pw*0.12), px(ph*0.30));
+  // 手
+  ctx.fillStyle = PIXEL_PAL.skin;
+  ctx.fillRect(px(cx-pw*0.38), px(baseY+ph*0.62), px(pw*0.12), px(ph*0.08));
+  ctx.fillRect(px(cx+pw*0.26), px(baseY+ph*0.62), px(pw*0.12), px(ph*0.08));
+  // 头
+  ctx.fillStyle = PIXEL_PAL.skin;
+  ctx.fillRect(px(cx-pw*0.22), px(baseY), px(pw*0.44), px(ph*0.30));
+  // 发髻/头发
+  ctx.fillStyle = PIXEL_PAL.hair;
+  ctx.fillRect(px(cx-pw*0.24), px(baseY), px(pw*0.48), px(ph*0.12));
+  ctx.fillRect(px(cx-pw*0.06), px(baseY-ph*0.08), px(pw*0.12), px(ph*0.10));
+  // 眼睛
+  ctx.fillStyle = "#111";
+  ctx.fillRect(px(cx-pw*0.12), px(baseY+ph*0.16), px(pw*0.06), px(ph*0.06));
+  ctx.fillRect(px(cx+pw*0.06), px(baseY+ph*0.16), px(pw*0.06), px(ph*0.06));
+  ctx.restore();
 }
 
 const battleFX = {
@@ -1917,31 +2099,6 @@ function fxCast(style){
 function fxEnemyDie(){ battleFX.enemyDown = 45; }
 function fxReset(){ battleFX.floats = []; battleFX.enemyDown = 0; battleFX.castT = 0; battleFX.shake = 0; }
 
-function drawCover(img, dx, dy, dw, dh){
-  const iw = img.naturalWidth, ih = img.naturalHeight;
-  if(!iw || !ih) return false;
-  const scale = Math.max(dw/iw, dh/ih);
-  const sw = iw*scale, sh = ih*scale;
-  bctx.drawImage(img, dx+(dw-sw)/2, dy+(dh-sh)/2, sw, sh);
-  return true;
-}
-function drawSprite(img, cx, bottomY, maxW, maxH){
-  const iw = img.naturalWidth, ih = img.naturalHeight;
-  if(!iw || !ih) return false;
-  const scale = Math.min(maxW/iw, maxH/ih);
-  const w = iw*scale, h = ih*scale;
-  bctx.drawImage(img, cx-w/2, bottomY-h, w, h);
-  return true;
-}
-function drawPlaceholder(cx, bottomY, w, h, color, label){
-  bctx.fillStyle = color;
-  bctx.fillRect(cx-w/2, bottomY-h, w, h);
-  bctx.fillStyle = "#fff";
-  bctx.font = "12px sans-serif";
-  bctx.textAlign = "center";
-  bctx.textBaseline = "middle";
-  bctx.fillText(label, cx, bottomY-h/2);
-}
 function drawHpBar(cx, topY, w, cur, max, color){
   const ratio = Math.max(0, Math.min(1, cur/max));
   bctx.fillStyle = "rgba(0,0,0,0.65)";
@@ -1996,14 +2153,8 @@ function drawBattle(){
     bctx.translate((Math.random()-0.5)*battleFX.shake, (Math.random()-0.5)*battleFX.shake);
   }
 
-  const bg = currentDungeon ? getImg("bg:"+currentDungeon.name, BG_ART[currentDungeon.name]) : null;
-  if(!isReady(bg) || !drawCover(bg, 0, 0, w, h)){
-    const g = bctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#20202c");
-    g.addColorStop(1, "#0d0d14");
-    bctx.fillStyle = g;
-    bctx.fillRect(0, 0, w, h);
-  }
+  // 内置像素场景背景
+  drawPixelSceneBg(bctx, w, h, currentDungeon ? currentDungeon.name : currentScene);
 
   bctx.fillStyle = "rgba(0,0,0,0.4)";
   bctx.fillRect(0, h*0.78, w, h*0.22);
@@ -2054,34 +2205,48 @@ function drawBattle(){
     });
   }
 
-  // 玩家单位
+  // 单位头顶：名字 + 血条 + 内力细条
+  function drawUnitLabel(cx, topY, w, name, hp, maxHp, mp, maxMp, hpColor){
+    bctx.textAlign = "center";
+    bctx.font = "10px sans-serif";
+    bctx.fillStyle = "rgba(0,0,0,0.6)";
+    bctx.fillText(name, cx+1, topY-11+1);
+    bctx.fillStyle = "#fff";
+    bctx.fillText(name, cx, topY-11);
+    drawHpBar(cx, topY, w, hp, maxHp, hpColor);
+    // 内力细条（血条下方）
+    if(maxMp > 0){
+      const mpRatio = Math.max(0, Math.min(1, (mp||0)/maxMp));
+      bctx.fillStyle = "rgba(0,0,0,0.65)";
+      bctx.fillRect(cx-w/2-1, topY+8, w+2, 5);
+      bctx.fillStyle = "#4a90e2";
+      bctx.fillRect(cx-w/2, topY+9, w*mpRatio, 3);
+    }
+  }
+
+  // 玩家单位（内置像素角色）
   const pc = cellCenter(player.pos || {x:1,y:2});
   const px = pc.x, py = pc.y;
-  const bob = Math.sin(t*2) * 2;
-  const pImg = getImg("player", PLAYER_ART);
-  if(!isReady(pImg) || !drawSprite(pImg, px, py+bob+16, 40, 52)){
-    drawPlaceholder(px, py+16, 30, 44, "#3a6ea5", player.school || "我");
-  }
-  drawHpBar(px, py-26, 56, player.hp, player.maxHp, "#4fd06b");
+  const pTheme = schoolTheme(player.school);
+  drawPixelWuxiaSprite(bctx, px, py+16, 40, 52, pTheme, t);
+  drawUnitLabel(px, py-26, 56, player.school || "我", player.hp, player.maxHp, player.mp, player.maxMp, "#4fd06b");
 
-  // 伙伴单位
+  // 伙伴单位（小像素角色）
   if(player.activePartner && player.partnerPos){
     const pp = cellCenter(player.partnerPos);
-    drawPlaceholder(pp.x, pp.y+16, 26, 38, "#3b8a6e", "友");
+    drawPixelWuxiaSprite(bctx, pp.x, pp.y+16, 26, 38, "common", t+0.7);
   }
 
   if(enemy && enemy.pos){
     const ec = cellCenter(enemy.pos);
     const ex = ec.x, ey = ec.y;
-    const eImg = getImg("enemy:"+enemy.name, ENEMY_ART[enemy.name]);
+    const eTheme = enemy.isBoss ? "boss" : (enemy.isElite ? "elite" : "common");
     const dead = enemy.hp <= 0;
     bctx.save();
     bctx.globalAlpha = dead ? Math.max(0, battleFX.enemyDown/45) : 1;
-    if(!isReady(eImg) || !drawSprite(eImg, ex, ey+Math.sin(t*2+1)*2+16, 44, 54)){
-      drawPlaceholder(ex, ey+16, 32, 46, "#8a3b3b", enemy.name);
-    }
+    drawPixelWuxiaSprite(bctx, ex, ey+16, 44, 54, eTheme, t+1.3);
     bctx.restore();
-    drawHpBar(ex, ey-26, 60, enemy.hp, enemy.maxHp, "#e05555");
+    drawUnitLabel(ex, ey-26, 60, enemy.name, enemy.hp, enemy.maxHp, enemy.mp, enemy.maxMp, "#e05555");
   }
 
   drawSlashEffect();
@@ -2147,4 +2312,141 @@ if(BC){
       refreshUI();
     }
   });
+}// ===================== 【敌方集气｜轻功加成｜头顶三栏血条渲染 整合模块】 =====================
+// 功能：敌人集气更新、轻功加成计算、玩家+敌人头顶血/内力/集气条绘制、封内判定、调试日志
+function checkEnemyQiSystem() {
+    if (!window.enemies || window.enemies.length <= 0) return false;
+    let passCount = 0;
+    const total = window.enemies.length;
+
+    window.enemies.forEach((enemy, idx) => {
+        enemy.qi = enemy.qi ?? 0;
+        enemy.maxQi = enemy.maxQi ?? 100;
+        enemy.qiSpeedBase = enemy.qiSpeedBase ?? 1.2;
+        enemy.qiUpdateEnable = true;
+
+        // 计算最终集气速度：基础速度 + 轻功加成
+        const qinggong = enemy.qinggong ?? 0;
+        const qgBonus = qinggong * 0.008; // 每1点轻功 +0.008集气速度，可自行调系数
+        const internalBonus = enemy.internalQiBonus ?? 0;
+        enemy.finalQiSpeed = enemy.qiSpeedBase + qgBonus + internalBonus;
+
+        const ok = enemy.qiUpdateEnable === true && typeof enemy.finalQiSpeed === "number";
+        if (ok) {
+            passCount++;
+            console.log(`【敌方${idx+1}】${enemy.name} ✅ 集气开启 | 集气:${enemy.qi.toFixed(2)}/${enemy.maxQi} 基础:${enemy.qiSpeedBase.toFixed(2)} 轻功加成:${qgBonus.toFixed(3)} 最终速度:${enemy.finalQiSpeed.toFixed(2)}`);
+        } else {
+            console.error(`【敌方${idx+1}】${enemy.name} ❌ 集气修复失败`, enemy);
+        }
+    });
+    console.log(`【敌方集气汇总】正常：${passCount}/${total}`);
+    return passCount === total;
 }
+
+// 每秒调试检测
+setInterval(() => {
+    if (window.inBattle) checkEnemyQiSystem();
+}, 1000);
+
+// 劫持战斗循环，更新集气
+const rawBattleLoop = window.battleLoop;
+if (typeof rawBattleLoop === "function") {
+    window.battleLoop = function (...args) {
+        const ret = rawBattleLoop(...args);
+        if (!window.inBattle || !window.enemies) return ret;
+        const dt = window.deltaTime ?? 1 / 60;
+
+        // 敌人集气更新
+        window.enemies.forEach(enemy => {
+            enemy.qi = enemy.qi ?? 0;
+            enemy.maxQi = enemy.maxQi ?? 100;
+            enemy.qiSpeedBase = enemy.qiSpeedBase ?? 1.2;
+            enemy.qiUpdateEnable = true;
+
+            // 轻功加成
+            const qinggong = enemy.qinggong ?? 0;
+            const qgBonus = qinggong * 0.008;
+            const internalBonus = enemy.internalQiBonus ?? 0;
+            enemy.finalQiSpeed = enemy.qiSpeedBase + qgBonus + internalBonus;
+
+            // 封内debuff：集气停止
+            if (enemy.hasDebuff && enemy.hasDebuff("封内")) return;
+
+            if (enemy.qiUpdateEnable && enemy.qi < enemy.maxQi) {
+                enemy.qi += enemy.finalQiSpeed * dt;
+                if (enemy.qi > enemy.maxQi) enemy.qi = enemy.maxQi;
+            }
+        });
+
+        // 玩家集气同步（和敌人一套规则，玩家也吃轻功加成）
+        if (window.player) {
+            const p = window.player;
+            p.qi = p.qi ?? 0;
+            p.maxQi = p.maxQi ?? 100;
+            p.qiSpeedBase = p.qiSpeedBase ?? 1.2;
+            p.qiUpdateEnable = true;
+
+            const pQg = p.qinggong ?? 0;
+            const pQgBonus = pQg * 0.008;
+            const pIntBonus = p.internalQiBonus ?? 0;
+            p.finalQiSpeed = p.qiSpeedBase + pQgBonus + pIntBonus;
+
+            if (!(p.hasDebuff && p.hasDebuff("封内")) && p.qiUpdateEnable && p.qi < p.maxQi) {
+                p.qi += p.finalQiSpeed * dt;
+                if (p.qi > p.maxQi) p.qi = p.maxQi;
+            }
+        }
+        return ret;
+    };
+} else {
+    console.warn("⚠️ 没有找到 window.battleLoop，无法挂载集气更新！");
+}
+
+// ===================== 头顶血条、内力条、集气条渲染函数 =====================
+// 调用时机：在你的canvas绘制角色之后调用 renderStatusBar(target, x, y)
+function renderStatusBar(target, x, y) {
+    if (!window.ctx) return;
+    const ctx = window.ctx;
+    const barW = 44;
+    const barH = 4;
+    const gap = 5;
+    let by = y;
+
+    // 1. 血条
+    const hpRatio = (target.hp ?? 0) / (target.maxHp ?? 100);
+    ctx.fillStyle = "#333";
+    ctx.fillRect(x, by, barW, barH);
+    ctx.fillStyle = "#e53935";
+    ctx.fillRect(x, by, barW * hpRatio, barH);
+    by += barH + 1;
+
+    // 2. 内力条
+    const mpRatio = (target.mp ?? 0) / (target.maxMp ?? 100);
+    ctx.fillStyle = "#333";
+    ctx.fillRect(x, by, barW, barH);
+    ctx.fillStyle = "#2196f3";
+    ctx.fillRect(x, by, barW * mpRatio, barH);
+    by += barH + 1;
+
+    // 3. 集气条
+    const qiRatio = (target.qi ?? 0) / (target.maxQi ?? 100);
+    ctx.fillStyle = "#333";
+    ctx.fillRect(x, by, barW, barH);
+    ctx.fillStyle = "#ffc107";
+    ctx.fillRect(x, by, barW * qiRatio, barH);
+    by += gap;
+
+    // 名字文本
+    ctx.fillStyle = "#fff";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(target.name ?? "???", x + barW / 2, by);
+}
+
+// 【重要】
+// 找到你绘制玩家、敌人角色的地方，在绘制完角色之后，加上这一句：
+// renderStatusBar(target, drawX, drawY - 28);
+// target = player / enemy，drawX drawY是角色绘制坐标
+// 示例：
+// renderStatusBar(player, player.x, player.y - 28);
+// renderStatusBar(enemy, enemy.x, enemy.y - 28);
